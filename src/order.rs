@@ -1,11 +1,14 @@
 pub mod order {
-    use serde::Deserialize;
+    #[derive(Debug)]
+    pub enum Ingredient {
+        GroundCoffee(u64),
+        HotWater(u64),
+        Cacao(u64),
+        MilkFoam(u64),
+    }
 
-    #[derive(Deserialize, Debug)]
+    #[derive(Debug)]
     pub struct Order {
-        ground_coffee: u64,
-        hot_water: u64,
-        cacao: u64,
-        milk_foam: u64,
+        pub ingredients: Vec<Ingredient>,
     }
 }
