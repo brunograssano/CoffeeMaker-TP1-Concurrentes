@@ -34,6 +34,7 @@ pub(crate) mod orders_reader {
         order_list_clone: Arc<RwLock<VecDeque<Order>>>,
         order_to_take: Arc<Semaphore>
     ) {
+        let mut id = 0;
         for order in orders {
             let mut ingredients = Vec::new();
             if 0 < order.ground_coffee {
@@ -49,15 +50,14 @@ pub(crate) mod orders_reader {
                 ingredients.push(Ingredient::MilkFoam(order.milk_foam));
             }
             if let Ok(mut queue) = order_list_clone.write() {
-                queue.push_back(Order {
-                    ingredients,
-                });
+                queue.push_back(Order::new(id, ingredients));
+                println!("[INFO] Added order {}", id);
+                id += 1;
                 order_to_take.release();
             } else {
                 println!("[ERROR] Error while taking the queue lock");
                 return;
             }
-            println!("[INFO] Added order");
         }
         println!("[INFO] There are no orders left");
     }
