@@ -1,20 +1,22 @@
 pub mod order {
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum Ingredient {
-        GroundCoffee(u64),
-        HotWater(u64),
-        Cacao(u64),
-        MilkFoam(u64),
+        GroundCoffee,
+        HotWater,
+        Cacao,
+        MilkFoam,
+        GrainsToGrind,
+        ColdMilk,
     }
 
     #[derive(Debug)]
     pub struct Order {
         pub id: usize,
-        pub ingredients: Vec<Ingredient>,
+        pub ingredients: Vec<(Ingredient, u64)>,
     }
 
     impl Order {
-        pub fn new(id: usize, ingredients: Vec<Ingredient>) -> Order {
+        pub fn new(id: usize, ingredients: Vec<(Ingredient, u64)>) -> Order {
             Order { id, ingredients }
         }
     }

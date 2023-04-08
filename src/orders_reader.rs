@@ -7,6 +7,9 @@ pub(crate) mod orders_reader {
     use serde::Deserialize;
     use std_semaphore::Semaphore;
 
+    use rand::{ thread_rng };
+    use rand::seq::SliceRandom;
+
     use crate::order::order::{ Ingredient, Order };
 
     #[derive(Deserialize, Debug)]
@@ -38,17 +41,18 @@ pub(crate) mod orders_reader {
         for order in orders {
             let mut ingredients = Vec::new();
             if 0 < order.ground_coffee {
-                ingredients.push(Ingredient::GroundCoffee(order.ground_coffee));
+                ingredients.push((Ingredient::GroundCoffee, order.ground_coffee));
             }
             if 0 < order.cacao {
-                ingredients.push(Ingredient::Cacao(order.cacao));
+                ingredients.push((Ingredient::Cacao, order.cacao));
             }
             if 0 < order.hot_water {
-                ingredients.push(Ingredient::HotWater(order.hot_water));
+                ingredients.push((Ingredient::HotWater, order.hot_water));
             }
             if 0 < order.milk_foam {
-                ingredients.push(Ingredient::MilkFoam(order.milk_foam));
+                ingredients.push((Ingredient::MilkFoam, order.milk_foam));
             }
+            ingredients.shuffle(&mut thread_rng());
             if let Ok(mut queue) = order_list_clone.write() {
                 queue.push_back(Order::new(id, ingredients));
                 println!("[INFO] Added order {}", id);
