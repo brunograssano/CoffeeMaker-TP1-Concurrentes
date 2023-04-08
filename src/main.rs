@@ -4,7 +4,7 @@ pub mod dispenser;
 pub mod coffee_maker;
 pub mod errors;
 
-use coffee_maker::CoffeeMaker::CoffeeMaker;
+use coffee_maker::coffee_maker::CoffeeMaker;
 
 fn main() {
     let coffee_maker = CoffeeMaker::new();

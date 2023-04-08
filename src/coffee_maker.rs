@@ -1,10 +1,5 @@
-pub mod CoffeeMaker {
-    use std::{
-        thread::{ JoinHandle, self },
-        collections::VecDeque,
-        sync::{ Arc, RwLock },
-        time::Duration,
-    };
+pub mod coffee_maker {
+    use std::{ thread::{ JoinHandle, self }, collections::VecDeque, sync::{ Arc, RwLock } };
 
     use std_semaphore::Semaphore;
     use crate::{
