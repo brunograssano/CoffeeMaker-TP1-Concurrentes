@@ -2,6 +2,7 @@
 pub enum DispenserError {
     LockError,
     EmptyQueueWhenNotExpected,
+    IngredientNotInMap,
 }
 
 impl<T> From<std::sync::PoisonError<T>> for DispenserError {
