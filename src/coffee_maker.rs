@@ -20,7 +20,7 @@ pub mod coffee_maker {
             N_DISPENSERS,
         },
         errors::{ CoffeeMakerError, DispenserError, ReplenisherError },
-        replenisher::replenisher::replenish_from_container,
+        replenisher::replenisher::{ replenish_from_container, replenish_from_external_source },
     };
 
     pub struct CoffeeMaker {
@@ -114,8 +114,24 @@ pub mod coffee_maker {
                 )
             });
 
+            let finish_clone = self.finish.clone();
+            let replenisher_clone = self.replenisher_cond.clone();
+            let ingredients_clone = self.ingredients_cond.clone();
+
+            let water_replenisher = thread::spawn(move || {
+                let container = (Ingredient::HotWater, water);
+                replenish_from_external_source(
+                    container,
+                    replenisher_clone,
+                    ingredients_clone,
+                    finish_clone,
+                    A_STORAGE
+                )
+            });
+
             replenisher_threads.push(milk_replenisher);
             replenisher_threads.push(coffee_replenisher);
+            replenisher_threads.push(water_replenisher);
             Ok(replenisher_threads)
         }
 
