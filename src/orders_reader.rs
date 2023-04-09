@@ -33,31 +33,18 @@ pub(crate) mod orders_reader {
     }
 
     fn add_orders_to_list(
-        orders: Vec<JsonOrder>,
-        order_list_clone: Arc<RwLock<VecDeque<Order>>>,
-        order_to_take: Arc<Semaphore>
+        json_orders: Vec<JsonOrder>,
+        orders_queue_lock: Arc<RwLock<VecDeque<Order>>>,
+        order_semaphore: Arc<Semaphore>
     ) {
         let mut id = 0;
-        for order in orders {
-            let mut ingredients = Vec::new();
-            if 0 < order.ground_coffee {
-                ingredients.push((Ingredient::GroundCoffee, order.ground_coffee));
-            }
-            if 0 < order.cacao {
-                ingredients.push((Ingredient::Cacao, order.cacao));
-            }
-            if 0 < order.hot_water {
-                ingredients.push((Ingredient::HotWater, order.hot_water));
-            }
-            if 0 < order.milk_foam {
-                ingredients.push((Ingredient::MilkFoam, order.milk_foam));
-            }
-            ingredients.shuffle(&mut thread_rng());
-            if let Ok(mut queue) = order_list_clone.write() {
-                queue.push_back(Order::new(id, ingredients));
+        for order in json_orders {
+            let ingredients = get_ingredients_from_order(order);
+            if let Ok(mut orders_queue) = orders_queue_lock.write() {
+                orders_queue.push_back(Order::new(id, ingredients));
                 println!("[INFO] Added order {}", id);
                 id += 1;
-                order_to_take.release();
+                order_semaphore.release();
             } else {
                 println!("[ERROR] Error while taking the queue lock");
                 return;
@@ -66,15 +53,33 @@ pub(crate) mod orders_reader {
         println!("[INFO] There are no orders left");
     }
 
+    fn get_ingredients_from_order(order: JsonOrder) -> Vec<(Ingredient, u64)> {
+        let mut ingredients = Vec::new();
+        if 0 < order.ground_coffee {
+            ingredients.push((Ingredient::GroundCoffee, order.ground_coffee));
+        }
+        if 0 < order.cacao {
+            ingredients.push((Ingredient::Cacao, order.cacao));
+        }
+        if 0 < order.hot_water {
+            ingredients.push((Ingredient::HotWater, order.hot_water));
+        }
+        if 0 < order.milk_foam {
+            ingredients.push((Ingredient::MilkFoam, order.milk_foam));
+        }
+        ingredients.shuffle(&mut thread_rng());
+        ingredients
+    }
+
     pub fn read_and_add_orders<P: AsRef<Path>>(
-        order_list_clone: Arc<RwLock<VecDeque<Order>>>,
-        order_to_take: Arc<Semaphore>,
+        order_list: Arc<RwLock<VecDeque<Order>>>,
+        order_semaphore: Arc<Semaphore>,
         path: P
     ) {
         let result = read_orders_from_file(path);
         match result {
-            Ok(orders) => add_orders_to_list(orders, order_list_clone, order_to_take),
-            Err(err) => println!("[ERROR] Error while reading the orders from the file"),
+            Ok(json_orders) => add_orders_to_list(json_orders, order_list, order_semaphore),
+            Err(_) => println!("[ERROR] Error while reading the orders from the file"),
         }
     }
 }
