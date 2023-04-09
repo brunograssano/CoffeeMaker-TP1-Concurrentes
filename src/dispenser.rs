@@ -1,5 +1,10 @@
 pub mod dispenser {
-    use std::{ sync::{ Arc, RwLock, Condvar, Mutex }, collections::{ VecDeque, HashMap } };
+    use std::{
+        sync::{ Arc, RwLock, Condvar, Mutex },
+        collections::{ VecDeque, HashMap },
+        time::Duration,
+        thread,
+    };
 
     use std_semaphore::Semaphore;
 
@@ -53,6 +58,8 @@ pub mod dispenser {
                         *in_container
                     );
                     *in_container -= quantity_required;
+
+                    thread::sleep(Duration::from_millis(quantity_required));
                     println!("[DISPENSER {}] Remains {} of {:?}", id, *in_container, ingredient);
                 } else {
                     println!("[ERROR] Error while taking the resource {:?} lock", ingredient);
