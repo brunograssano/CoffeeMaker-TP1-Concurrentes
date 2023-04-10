@@ -20,7 +20,8 @@ pub mod coffee_maker {
             N_DISPENSERS,
         },
         errors::{ CoffeeMakerError, DispenserError, ReplenisherError },
-        replenisher::replenisher::{ replenish_from_container, replenish_from_external_source },
+        container_source_replenisher::container_source_replenisher::ContainerReplenisher,
+        external_source_replenisher::external_source_replenisher::ExternalReplenisher,
     };
 
     pub struct CoffeeMaker {
@@ -30,11 +31,26 @@ pub mod coffee_maker {
         replenisher_cond: Arc<Condvar>,
         ingredients_cond: Arc<Condvar>,
         dispensers: Vec<Arc<Dispenser>>,
+        container_replenishers: Vec<Arc<ContainerReplenisher>>,
+        water_replenisher: Arc<ExternalReplenisher>,
     }
 
     impl CoffeeMaker {
         pub fn new() -> CoffeeMaker {
-            let resources = Arc::new(get_map_of_ingredients());
+            let mut resources = HashMap::new();
+            let cold_milk = Arc::new(Mutex::new(L_STORAGE));
+            let milk_foam = Arc::new(Mutex::new(E_STORAGE));
+            let hot_water = Arc::new(Mutex::new(A_STORAGE));
+            let grains_to_grind = Arc::new(Mutex::new(G_STORAGE));
+            let ground_coffee = Arc::new(Mutex::new(M_STORAGE));
+            resources.insert(Ingredient::ColdMilk, cold_milk.clone());
+            resources.insert(Ingredient::MilkFoam, milk_foam.clone());
+            resources.insert(Ingredient::HotWater, hot_water.clone());
+            resources.insert(Ingredient::GrainsToGrind, grains_to_grind.clone());
+            resources.insert(Ingredient::GroundCoffee, ground_coffee.clone());
+            resources.insert(Ingredient::Cacao, Arc::new(Mutex::new(C_STORAGE)));
+
+            let resources = Arc::new(resources);
             let order_list = Arc::new(RwLock::new(VecDeque::new()));
             let orders_to_take = Arc::new(Semaphore::new(0));
             let replenisher_cond = Arc::new(Condvar::new());
@@ -60,6 +76,41 @@ pub mod coffee_maker {
                 })
                 .collect::<Vec<Arc<Dispenser>>>();
 
+            let mut container_replenishers = Vec::new();
+
+            container_replenishers.push(
+                Arc::new(
+                    ContainerReplenisher::new(
+                        (Ingredient::GrainsToGrind, grains_to_grind.clone()),
+                        (Ingredient::GroundCoffee, ground_coffee.clone()),
+                        replenisher_cond.clone(),
+                        ingredients_cond.clone(),
+                        M_STORAGE
+                    )
+                )
+            );
+
+            container_replenishers.push(
+                Arc::new(
+                    ContainerReplenisher::new(
+                        (Ingredient::ColdMilk, cold_milk.clone()),
+                        (Ingredient::MilkFoam, milk_foam.clone()),
+                        replenisher_cond.clone(),
+                        ingredients_cond.clone(),
+                        E_STORAGE
+                    )
+                )
+            );
+
+            let water_replenisher = Arc::new(
+                ExternalReplenisher::new(
+                    (Ingredient::HotWater, hot_water.clone()),
+                    replenisher_cond.clone(),
+                    ingredients_cond.clone(),
+                    A_STORAGE
+                )
+            );
+
             CoffeeMaker {
                 order_list,
                 orders_to_take,
@@ -67,90 +118,9 @@ pub mod coffee_maker {
                 replenisher_cond,
                 ingredients_cond,
                 dispensers,
+                container_replenishers,
+                water_replenisher,
             }
-        }
-
-        fn create_replenishers(
-            &self
-        ) -> Result<Vec<JoinHandle<Result<(), ReplenisherError>>>, CoffeeMakerError> {
-            let mut replenisher_threads = Vec::new();
-            let cold_milk = self.resources
-                .get(&Ingredient::ColdMilk)
-                .ok_or(CoffeeMakerError::IngredientNotInMap)?
-                .clone();
-            let milk_foam = self.resources
-                .get(&Ingredient::MilkFoam)
-                .ok_or(CoffeeMakerError::IngredientNotInMap)?
-                .clone();
-
-            let ground_coffee = self.resources
-                .get(&Ingredient::GroundCoffee)
-                .ok_or(CoffeeMakerError::IngredientNotInMap)?
-                .clone();
-
-            let grains_to_grind = self.resources
-                .get(&Ingredient::GrainsToGrind)
-                .ok_or(CoffeeMakerError::IngredientNotInMap)?
-                .clone();
-
-            let water = self.resources
-                .get(&Ingredient::HotWater)
-                .ok_or(CoffeeMakerError::IngredientNotInMap)?
-                .clone();
-
-            let finish_clone = Arc::new(RwLock::new(false));
-            let replenisher_clone = self.replenisher_cond.clone();
-            let ingredients_clone = self.ingredients_cond.clone();
-
-            let milk_replenisher = thread::spawn(move || {
-                let origin = (Ingredient::ColdMilk, cold_milk);
-                let destination = (Ingredient::MilkFoam, milk_foam);
-                replenish_from_container(
-                    origin,
-                    destination,
-                    replenisher_clone,
-                    ingredients_clone,
-                    finish_clone,
-                    E_STORAGE
-                )
-            });
-
-            let finish_clone = Arc::new(RwLock::new(false));
-            let replenisher_clone = self.replenisher_cond.clone();
-            let ingredients_clone = self.ingredients_cond.clone();
-
-            let coffee_replenisher = thread::spawn(move || {
-                let origin = (Ingredient::GrainsToGrind, grains_to_grind);
-                let destination = (Ingredient::GroundCoffee, ground_coffee);
-                replenish_from_container(
-                    origin,
-                    destination,
-                    replenisher_clone,
-                    ingredients_clone,
-                    finish_clone,
-                    M_STORAGE
-                )
-            });
-
-            let finish_clone = Arc::new(RwLock::new(false));
-            let replenisher_clone = self.replenisher_cond.clone();
-            let ingredients_clone = self.ingredients_cond.clone();
-
-            let water_replenisher = thread::spawn(move || {
-                let container = (Ingredient::HotWater, water);
-                replenish_from_external_source(
-                    container,
-                    replenisher_clone,
-                    ingredients_clone,
-                    finish_clone,
-                    A_STORAGE
-                )
-            });
-
-            replenisher_threads.push(milk_replenisher);
-            replenisher_threads.push(coffee_replenisher);
-            replenisher_threads.push(water_replenisher);
-            Ok(replenisher_threads)
         }
 
         pub fn manage_orders(&self) -> Result<(), CoffeeMakerError> {
@@ -162,7 +132,20 @@ pub mod coffee_maker {
                 read_and_add_orders(orders_list_clone, orders_to_take_clone, "orders.json");
             });
 
-            let replenisher_threads = self.create_replenishers()?;
+            let _replenisher_threads: Vec<
+                JoinHandle<Result<(), ReplenisherError>>
+            > = self.container_replenishers
+                .iter()
+                .map(|replenisher| {
+                    let replenisher_clone = replenisher.clone();
+                    thread::spawn(move || { replenisher_clone.replenish_container() })
+                })
+                .collect();
+
+            let water_replenisher_clone = self.water_replenisher.clone();
+            let _water_replenisher_thread = thread::spawn(move || {
+                water_replenisher_clone.replenish_container()
+            });
 
             let dispenser_threads: Vec<JoinHandle<Result<(), DispenserError>>> = self.dispensers
                 .iter()
@@ -178,16 +161,5 @@ pub mod coffee_maker {
             }
             Ok(())
         }
-    }
-
-    fn get_map_of_ingredients() -> HashMap<Ingredient, Arc<Mutex<u64>>> {
-        let mut resources = HashMap::new();
-        resources.insert(Ingredient::ColdMilk, Arc::new(Mutex::new(L_STORAGE)));
-        resources.insert(Ingredient::MilkFoam, Arc::new(Mutex::new(E_STORAGE)));
-        resources.insert(Ingredient::Cacao, Arc::new(Mutex::new(C_STORAGE)));
-        resources.insert(Ingredient::HotWater, Arc::new(Mutex::new(A_STORAGE)));
-        resources.insert(Ingredient::GrainsToGrind, Arc::new(Mutex::new(G_STORAGE)));
-        resources.insert(Ingredient::GroundCoffee, Arc::new(Mutex::new(M_STORAGE)));
-        resources
     }
 }

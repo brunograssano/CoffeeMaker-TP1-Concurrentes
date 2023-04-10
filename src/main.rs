@@ -3,8 +3,9 @@ pub mod order;
 pub mod dispenser;
 pub mod coffee_maker;
 pub mod errors;
-pub mod replenisher;
 pub mod constants;
+pub mod external_source_replenisher;
+pub mod container_source_replenisher;
 
 use coffee_maker::coffee_maker::CoffeeMaker;
 
