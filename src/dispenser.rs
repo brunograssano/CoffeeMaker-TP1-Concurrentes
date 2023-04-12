@@ -17,7 +17,7 @@ pub mod dispenser {
         finish: Arc<RwLock<bool>>,
         replenisher: Arc<Condvar>,
         ingredients_available: Arc<Condvar>,
-        resources: Arc<HashMap<Ingredient, Arc<Mutex<u64>>>>,
+        resources: Arc<HashMap<Ingredient, Arc<Mutex<(u64, u64)>>>>,
         orders_processed: Arc<RwLock<u64>>,
     }
 
@@ -28,7 +28,8 @@ pub mod dispenser {
             orders_to_take: Arc<Semaphore>,
             replenisher: Arc<Condvar>,
             ingredients_available: Arc<Condvar>,
-            resources: Arc<HashMap<Ingredient, Arc<Mutex<u64>>>>
+            resources: Arc<HashMap<Ingredient, Arc<Mutex<(u64, u64)>>>>,
+            orders_processed: Arc<RwLock<u64>>
         ) -> Dispenser {
             Dispenser {
                 id,
@@ -37,7 +38,7 @@ pub mod dispenser {
                 replenisher,
                 ingredients_available,
                 resources,
-                orders_processed: Arc::new(RwLock::new(0)),
+                orders_processed,
                 finish: Arc::new(RwLock::new(false)),
             }
         }
@@ -63,8 +64,8 @@ pub mod dispenser {
                             self.id,
                             ingredient
                         );
-                        let mut in_container = self.ingredients_available
-                            .wait_while(lock, |quantity_in_container| {
+                        let mut mutex = self.ingredients_available
+                            .wait_while(lock, |(quantity_in_container, _)| {
                                 let need_to_wake_up_replenisher =
                                     *quantity_in_container < quantity_required;
                                 if need_to_wake_up_replenisher {
@@ -78,26 +79,35 @@ pub mod dispenser {
                                 need_to_wake_up_replenisher
                             })
                             .map_err(|_| { DispenserError::LockError })?;
+                        let (mut remaining, mut consumed) = *mutex;
                         println!(
                             "[DISPENSER {}] Uses {} of {:?}, there is {}",
                             self.id,
                             quantity_required,
                             ingredient,
-                            *in_container
+                            remaining
                         );
-                        *in_container -= quantity_required;
-
+                        remaining -= quantity_required;
+                        consumed += quantity_required;
+                        *mutex = (remaining, consumed);
                         thread::sleep(Duration::from_millis(quantity_required));
                         println!(
                             "[DISPENSER {}] Remains {} of {:?}",
                             self.id,
-                            *in_container,
+                            remaining,
                             ingredient
                         );
                     } else {
                         println!("[ERROR] Error while taking the resource {:?} lock", ingredient);
                         return Err(DispenserError::LockError);
                     }
+                }
+
+                {
+                    let mut processed = self.orders_processed
+                        .write()
+                        .map_err(|_| { DispenserError::LockError })?;
+                    *processed += 1;
                 }
 
                 if *self.finish.read()? {

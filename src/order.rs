@@ -1,4 +1,5 @@
 pub mod order {
+    pub const TOTAL_INGREDIENTS: usize = 6;
     #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum Ingredient {
         GroundCoffee,

@@ -12,6 +12,8 @@ pub enum ReplenisherError {
 pub enum CoffeeMakerError {
     JoinError,
     IngredientNotInMap,
+    LockError,
+    EmptyQueueWhenNotExpected,
 }
 
 impl<T> From<std::sync::PoisonError<T>> for DispenserError {

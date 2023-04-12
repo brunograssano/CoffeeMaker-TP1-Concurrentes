@@ -10,4 +10,6 @@ pub mod constants {
     pub const REPLENISH_LIMIT: u64 = 300;
 
     pub const MINIMUM_WAIT_TIME_REPLENISHER: u64 = 100;
+
+    pub const STATISTICS_WAIT_IN_MS: u64 = 5000;
 }

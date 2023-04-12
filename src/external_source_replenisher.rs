@@ -9,7 +9,7 @@ pub(crate) mod external_source_replenisher {
 
     pub struct ExternalReplenisher {
         ingredient: Ingredient,
-        container_lock: Arc<Mutex<u64>>,
+        container_lock: Arc<Mutex<(u64, u64)>>,
         replenisher_cond: Arc<Condvar>,
         ingredients_cond: Arc<Condvar>,
         finish: Arc<RwLock<bool>>,
@@ -18,7 +18,7 @@ pub(crate) mod external_source_replenisher {
 
     impl ExternalReplenisher {
         pub fn new(
-            container: (Ingredient, Arc<Mutex<u64>>),
+            container: (Ingredient, Arc<Mutex<(u64, u64)>>),
             replenisher_cond: Arc<Condvar>,
             ingredients_cond: Arc<Condvar>,
             max_storage_of_container: u64
@@ -36,17 +36,18 @@ pub(crate) mod external_source_replenisher {
         pub fn replenish_container(&self) -> Result<(), ReplenisherError> {
             loop {
                 if let Ok(lock) = self.container_lock.lock() {
-                    let mut dest_remaining = self.replenisher_cond
-                        .wait_while(lock, |remaining| { *remaining > REPLENISH_LIMIT })
+                    let mut mutex = self.replenisher_cond
+                        .wait_while(lock, |(remaining, _)| { *remaining > REPLENISH_LIMIT })
                         .map_err(|_| { ReplenisherError::LockError })?;
 
                     if *self.finish.read()? {
                         // TODO
                         return Ok(());
                     }
-
-                    let replenish_quantity = self.max_storage_of_container - *dest_remaining;
-                    *dest_remaining = self.max_storage_of_container;
+                    let (mut dest_remaining, _) = *mutex;
+                    let replenish_quantity = self.max_storage_of_container - dest_remaining;
+                    dest_remaining += replenish_quantity;
+                    (*mutex).0 = dest_remaining;
                     thread::sleep(
                         Duration::from_millis(MINIMUM_WAIT_TIME_REPLENISHER + replenish_quantity)
                     );
