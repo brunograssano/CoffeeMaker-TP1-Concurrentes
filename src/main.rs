@@ -8,7 +8,7 @@ pub mod external_source_replenisher;
 pub mod container_source_replenisher;
 pub mod statistics;
 
-use coffee_maker::coffee_maker::CoffeeMaker;
+use coffee_maker::CoffeeMaker;
 
 fn main() {
     let coffee_maker = CoffeeMaker::new();

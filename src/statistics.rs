@@ -1,12 +1,6 @@
 use std::{ sync::{ Arc, Mutex, RwLock }, collections::HashMap, time::Duration, thread };
 
-use crate::{
-    dispenser::dispenser::Dispenser,
-    external_source_replenisher::external_source_replenisher::ExternalReplenisher,
-    order::order::Ingredient,
-    errors::CoffeeMakerError,
-    constants::constants::STATISTICS_WAIT_IN_MS,
-};
+use crate::{ order::Ingredient, errors::CoffeeMakerError, constants::STATISTICS_WAIT_IN_MS };
 
 pub struct StatisticsPrinter {
     processed: Arc<RwLock<u64>>,
