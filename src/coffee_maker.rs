@@ -4,7 +4,6 @@ use std::{
     sync::{ Arc, RwLock, Condvar, Mutex },
 };
 
-use std_semaphore::Semaphore;
 use crate::{
     orders_reader::read_and_add_orders,
     order::{ Order, Ingredient, TOTAL_INGREDIENTS },
@@ -17,8 +16,8 @@ use crate::{
 };
 
 pub struct CoffeeMaker {
-    order_list: Arc<RwLock<VecDeque<Order>>>,
-    orders_to_take: Arc<Semaphore>,
+    order_list: Arc<Mutex<VecDeque<Order>>>,
+    orders_to_take: Arc<Condvar>,
     dispensers: Vec<Arc<Dispenser>>,
     container_replenishers: Vec<Arc<ContainerReplenisher>>,
     water_replenisher: Arc<ExternalReplenisher>,
@@ -41,8 +40,8 @@ impl CoffeeMaker {
         resources.insert(Ingredient::Cacao, Arc::new(Mutex::new((C_STORAGE, 0))));
 
         let resources = Arc::new(resources);
-        let order_list = Arc::new(RwLock::new(VecDeque::new()));
-        let orders_to_take = Arc::new(Semaphore::new(0));
+        let order_list = Arc::new(Mutex::new(VecDeque::new()));
+        let orders_to_take = Arc::new(Condvar::new());
         let replenisher_cond = Arc::new(Condvar::new());
         let ingredients_cond = Arc::new(Condvar::new());
 
@@ -110,15 +109,15 @@ impl CoffeeMaker {
         }
     }
 
-    pub fn manage_orders(&self) -> Result<(), CoffeeMakerError> {
+    pub fn manage_orders(&self) {
         let orders_list_clone = self.order_list.clone();
         let orders_to_take_clone = self.orders_to_take.clone();
 
         let reader = thread::spawn(move || {
-            read_and_add_orders(orders_list_clone, orders_to_take_clone, "orders.json");
+            read_and_add_orders(orders_list_clone, orders_to_take_clone, "orders.json")
         });
 
-        let _replenisher_threads: Vec<
+        let replenisher_threads: Vec<
             JoinHandle<Result<(), CoffeeMakerError>>
         > = self.container_replenishers
             .iter()
@@ -129,13 +128,13 @@ impl CoffeeMaker {
             .collect();
 
         let water_replenisher_clone = self.water_replenisher.clone();
-        let _water_replenisher_thread = thread::spawn(move || {
+        let water_replenisher_thread = thread::spawn(move || {
             water_replenisher_clone.replenish_container()
         });
 
         let statistics_printer_clone = self.statistics_printer.clone();
-        let _statistics_thread = thread::spawn(move || {
-            statistics_printer_clone.print_statistics();
+        let statistics_thread = thread::spawn(move || {
+            statistics_printer_clone.print_statistics()
         });
 
         let dispenser_threads: Vec<JoinHandle<Result<(), CoffeeMakerError>>> = self.dispensers
@@ -146,10 +145,37 @@ impl CoffeeMaker {
             })
             .collect();
 
-        reader.join().map_err(|_| { CoffeeMakerError::JoinError })?;
-        for dispenser in dispenser_threads {
-            dispenser.join().expect("Error en join");
+        if let Err(err) = reader.join() {
+            println!("[ERROR ON READER] {:?}", err);
         }
-        Ok(())
+
+        for dispenser in &self.dispensers {
+            dispenser.finish();
+        }
+
+        for dispenser in dispenser_threads {
+            if let Err(err) = dispenser.join() {
+                println!("[ERROR ON DISPENSER] {:?}", err);
+            }
+        }
+
+        for replenisher in &self.container_replenishers {
+            replenisher.finish();
+        }
+        self.water_replenisher.finish();
+
+        for replenisher in replenisher_threads {
+            if let Err(err) = replenisher.join() {
+                println!("[ERROR ON REPLENISHER] {:?}", err);
+            }
+        }
+
+        if let Err(err) = water_replenisher_thread.join() {
+            println!("[ERROR ON REPLENISHER] {:?}", err);
+        }
+        self.statistics_printer.finish();
+        if let Err(err) = statistics_thread.join() {
+            println!("[ERROR ON STATISTICS THREAD] {:?}", err);
+        }
     }
 }

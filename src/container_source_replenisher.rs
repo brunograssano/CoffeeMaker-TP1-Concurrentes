@@ -1,5 +1,7 @@
 use std::{ sync::{ Condvar, Arc, RwLock, Mutex }, cmp::min, thread, time::Duration };
 
+use log::{ error, debug };
+
 use crate::{
     order::Ingredient,
     errors::CoffeeMakerError,
@@ -38,15 +40,30 @@ impl ContainerReplenisher {
             finish: Arc::new(RwLock::new(false)),
         }
     }
+
+    pub fn finish(&self) {
+        if let Ok(mut finish) = self.finish.write() {
+            *finish = true;
+            self.replenisher_cond.notify_all();
+            return;
+        }
+        error!("Error setting replenisher to finish");
+    }
+
     pub fn replenish_container(&self) -> Result<(), CoffeeMakerError> {
         loop {
             if let Ok(lock) = self.dest_container_lock.lock() {
                 let mut mutex = self.replenisher_cond
-                    .wait_while(lock, |(remaining, _)| { *remaining > REPLENISH_LIMIT })
+                    .wait_while(lock, |(remaining, _)| {
+                        let mut finish = true;
+                        if let Ok(finish_result) = self.finish.read() {
+                            finish = *finish_result;
+                        }
+                        *remaining > REPLENISH_LIMIT && !finish
+                    })
                     .map_err(|_| { CoffeeMakerError::LockError })?;
 
                 if *self.finish.read()? {
-                    // TODO
                     return Ok(());
                 }
                 let (mut dest_remaining, _) = *mutex;
@@ -57,14 +74,14 @@ impl ContainerReplenisher {
                     Duration::from_millis(MINIMUM_WAIT_TIME_REPLENISHER + replenish_quantity)
                 );
                 self.ingredients_cond.notify_all();
-                println!(
+                debug!(
                     "[REPLENISHER] Replenished {:?} with {} of {:?}",
                     self.destination_ingredient,
                     replenish_quantity,
                     self.source_ingredient
                 );
             } else {
-                println!(
+                error!(
                     "[ERROR] Error while taking the resource {:?} lock",
                     self.destination_ingredient
                 );

@@ -1,14 +1,15 @@
+use log::{ info, error, debug };
 use std::{ error::Error, collections::VecDeque };
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use std::sync::{ Arc, RwLock };
+use std::sync::{ Arc, Mutex, Condvar };
 use serde::Deserialize;
-use std_semaphore::Semaphore;
 
 use rand::{ thread_rng };
 use rand::seq::SliceRandom;
 
+use crate::errors::CoffeeMakerError;
 use crate::order::{ Ingredient, Order };
 
 #[derive(Deserialize, Debug)]
@@ -33,23 +34,24 @@ fn read_orders_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<JsonOrder>, Box<
 
 fn add_orders_to_list(
     json_orders: Vec<JsonOrder>,
-    orders_queue_lock: Arc<RwLock<VecDeque<Order>>>,
-    order_semaphore: Arc<Semaphore>
-) {
+    orders_queue_lock: Arc<Mutex<VecDeque<Order>>>,
+    order_semaphore: Arc<Condvar>
+) -> Result<(), CoffeeMakerError> {
     let mut id = 0;
     for order in json_orders {
         let ingredients = get_ingredients_from_order(order);
-        if let Ok(mut orders_queue) = orders_queue_lock.write() {
+        if let Ok(mut orders_queue) = orders_queue_lock.lock() {
             orders_queue.push_back(Order::new(id, ingredients));
-            println!("[INFO] Added order {}", id);
+            debug!("[READER] Added order {}", id);
             id += 1;
-            order_semaphore.release();
+            order_semaphore.notify_one();
         } else {
-            println!("[ERROR] Error while taking the queue lock");
-            return;
+            error!("[READER] Error while taking the queue lock");
+            return Err(CoffeeMakerError::LockError);
         }
     }
-    println!("[INFO] There are no orders left");
+    info!("[READER] No more orders left");
+    Ok(())
 }
 
 fn get_ingredients_from_order(order: JsonOrder) -> Vec<(Ingredient, u64)> {
@@ -71,13 +73,13 @@ fn get_ingredients_from_order(order: JsonOrder) -> Vec<(Ingredient, u64)> {
 }
 
 pub fn read_and_add_orders<P: AsRef<Path>>(
-    order_list: Arc<RwLock<VecDeque<Order>>>,
-    order_semaphore: Arc<Semaphore>,
+    order_list: Arc<Mutex<VecDeque<Order>>>,
+    order_semaphore: Arc<Condvar>,
     path: P
-) {
+) -> Result<(), CoffeeMakerError> {
     let result = read_orders_from_file(path);
     match result {
         Ok(json_orders) => add_orders_to_list(json_orders, order_list, order_semaphore),
-        Err(_) => println!("[ERROR] Error while reading the orders from the file"),
+        Err(_) => Err(CoffeeMakerError::FileReaderError),
     }
 }

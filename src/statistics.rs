@@ -1,11 +1,13 @@
 use std::{ sync::{ Arc, Mutex, RwLock }, collections::HashMap, time::Duration, thread };
 
+use log::error;
+
 use crate::{ order::Ingredient, errors::CoffeeMakerError, constants::STATISTICS_WAIT_IN_MS };
 
 pub struct StatisticsPrinter {
     processed: Arc<RwLock<u64>>,
     resources: Arc<HashMap<Ingredient, Arc<Mutex<(u64, u64)>>>>,
-    finish: Arc<RwLock<bool>>,
+    finish: Arc<Mutex<bool>>,
 }
 
 impl StatisticsPrinter {
@@ -16,12 +18,24 @@ impl StatisticsPrinter {
         StatisticsPrinter {
             processed,
             resources,
-            finish: Arc::new(RwLock::new(false)),
+            finish: Arc::new(Mutex::new(false)),
         }
+    }
+
+    pub fn finish(&self) {
+        if let Ok(mut finish) = self.finish.lock() {
+            *finish = true;
+            return;
+        }
+        error!("Error setting statistics thread to finish");
     }
 
     pub fn print_statistics(&self) -> Result<(), CoffeeMakerError> {
         loop {
+            if *self.finish.lock()? {
+                return Ok(());
+            }
+
             let orders_processed = {
                 *self.processed.read().map_err(|_| { CoffeeMakerError::LockError })?
             };

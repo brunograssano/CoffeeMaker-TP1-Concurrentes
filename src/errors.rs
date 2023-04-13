@@ -4,6 +4,7 @@ pub enum CoffeeMakerError {
     IngredientNotInMap,
     LockError,
     EmptyQueueWhenNotExpected,
+    FileReaderError,
 }
 
 impl<T> From<std::sync::PoisonError<T>> for CoffeeMakerError {
