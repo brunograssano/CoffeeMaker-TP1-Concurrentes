@@ -60,23 +60,25 @@ impl ExternalReplenisher {
                 if *self.finish.read()? {
                     return Ok(());
                 }
-                let (mut dest_remaining, _) = *mutex;
-                let replenish_quantity = self.max_storage_of_container - dest_remaining;
-                dest_remaining += replenish_quantity;
-                (*mutex).0 = dest_remaining;
-                thread::sleep(
-                    Duration::from_millis(MINIMUM_WAIT_TIME_REPLENISHER + replenish_quantity)
-                );
+                self.replenish(&mut mutex);
                 self.ingredients_cond.notify_all();
-                info!(
-                    "[REPLENISHER] Replenished {:?} with {} from external source",
-                    self.ingredient,
-                    replenish_quantity
-                );
             } else {
                 error!("[REPLENISHER] Error while taking the resource {:?} lock", self.ingredient);
                 return Err(CoffeeMakerError::LockError);
             }
         }
+    }
+
+    fn replenish(&self, mutex: &mut std::sync::MutexGuard<(u64, u64)>) {
+        let (mut dest_remaining, _) = **mutex;
+        let replenish_quantity = self.max_storage_of_container - dest_remaining;
+        dest_remaining += replenish_quantity;
+        (*mutex).0 = dest_remaining;
+        thread::sleep(Duration::from_millis(MINIMUM_WAIT_TIME_REPLENISHER + replenish_quantity));
+        info!(
+            "[REPLENISHER] Replenished {:?} with {} from external source",
+            self.ingredient,
+            replenish_quantity
+        );
     }
 }

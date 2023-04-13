@@ -66,20 +66,8 @@ impl ContainerReplenisher {
                 if *self.finish.read()? {
                     return Ok(());
                 }
-                let (mut dest_remaining, _) = *mutex;
-                let replenish_quantity = self.take_resource_from_source(dest_remaining)?;
-                dest_remaining += replenish_quantity;
-                (*mutex).0 = dest_remaining;
-                thread::sleep(
-                    Duration::from_millis(MINIMUM_WAIT_TIME_REPLENISHER + replenish_quantity)
-                );
+                self.replenish(&mut mutex)?;
                 self.ingredients_cond.notify_all();
-                debug!(
-                    "[REPLENISHER] Replenished {:?} with {} of {:?}",
-                    self.destination_ingredient,
-                    replenish_quantity,
-                    self.source_ingredient
-                );
             } else {
                 error!(
                     "[ERROR] Error while taking the resource {:?} lock",
@@ -88,6 +76,24 @@ impl ContainerReplenisher {
                 return Err(CoffeeMakerError::LockError);
             }
         }
+    }
+
+    fn replenish(
+        &self,
+        mutex: &mut std::sync::MutexGuard<(u64, u64)>
+    ) -> Result<(), CoffeeMakerError> {
+        let (mut dest_remaining, _) = **mutex;
+        let replenish_quantity = self.take_resource_from_source(dest_remaining)?;
+        dest_remaining += replenish_quantity;
+        (*mutex).0 = dest_remaining;
+        thread::sleep(Duration::from_millis(MINIMUM_WAIT_TIME_REPLENISHER + replenish_quantity));
+        debug!(
+            "[REPLENISHER] Replenished {:?} with {} of {:?}",
+            self.destination_ingredient,
+            replenish_quantity,
+            self.source_ingredient
+        );
+        Ok(())
     }
 
     fn take_resource_from_source(&self, dest_remaining: u64) -> Result<u64, CoffeeMakerError> {

@@ -44,7 +44,7 @@ fn add_orders_to_list(
             orders_queue.push_back(Order::new(id, ingredients));
             debug!("[READER] Added order {}", id);
             id += 1;
-            order_semaphore.notify_one();
+            order_semaphore.notify_all();
         } else {
             error!("[READER] Error while taking the queue lock");
             return Err(CoffeeMakerError::LockError);

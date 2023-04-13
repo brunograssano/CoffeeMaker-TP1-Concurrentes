@@ -71,53 +71,76 @@ impl Dispenser {
             };
 
             debug!("[DISPENSER {}] Takes order {}", self.id, order.id);
+            self.process_order(order)?;
+            self.increase_processed_orders()?;
+        }
+    }
 
-            for (ingredient, quantity_required) in order.ingredients {
-                let resource_lock = self.resources
-                    .get(&ingredient)
-                    .ok_or(CoffeeMakerError::IngredientNotInMap)?;
-                if let Ok(lock) = resource_lock.lock() {
-                    debug!("[DISPENSER {}] Takes access to container of {:?}", self.id, ingredient);
-                    let mut mutex = self.ingredients_available
-                        .wait_while(lock, |(quantity_in_container, _)| {
-                            let need_to_wake_up_replenisher =
-                                *quantity_in_container < quantity_required;
-                            if need_to_wake_up_replenisher {
-                                info!(
-                                    "[DISPENSER {}] Not enough {:?} for this order, waking up replenisher",
-                                    self.id,
-                                    ingredient
-                                );
-                                self.replenisher.notify_all();
-                            }
-                            need_to_wake_up_replenisher
-                        })
-                        .map_err(|_| { CoffeeMakerError::LockError })?;
-                    let (mut remaining, mut consumed) = *mutex;
-                    debug!(
-                        "[DISPENSER {}] Uses {} of {:?}, there is {}",
-                        self.id,
-                        quantity_required,
-                        ingredient,
-                        remaining
-                    );
-                    remaining -= quantity_required;
-                    consumed += quantity_required;
-                    *mutex = (remaining, consumed);
-                    thread::sleep(Duration::from_millis(quantity_required));
-                    debug!("[DISPENSER {}] Remains {} of {:?}", self.id, remaining, ingredient);
-                } else {
-                    error!("[ERROR] Error while taking the resource {:?} lock", ingredient);
-                    return Err(CoffeeMakerError::LockError);
-                }
-            }
-
-            {
-                let mut processed = self.orders_processed
-                    .write()
+    fn process_order(&self, order: Order) -> Result<(), CoffeeMakerError> {
+        for (ingredient, quantity_required) in order.ingredients {
+            let resource_lock = self.get_resource_lock(&ingredient)?;
+            if let Ok(lock) = resource_lock.lock() {
+                debug!("[DISPENSER {}] Takes access to container of {:?}", self.id, ingredient);
+                let mut mutex = self.ingredients_available
+                    .wait_while(lock, |(quantity_in_container, _)| {
+                        let need_to_wake_up_replenisher =
+                            *quantity_in_container < quantity_required;
+                        if need_to_wake_up_replenisher {
+                            info!(
+                                "[DISPENSER {}] Not enough {:?} for this order, waking up replenisher",
+                                self.id,
+                                ingredient
+                            );
+                            self.replenisher.notify_all();
+                        }
+                        need_to_wake_up_replenisher
+                    })
                     .map_err(|_| { CoffeeMakerError::LockError })?;
-                *processed += 1;
+                self.consume_ingredient(&mut mutex, quantity_required, &ingredient);
+            } else {
+                error!("[ERROR] Error while taking the resource {:?} lock", ingredient);
+                return Err(CoffeeMakerError::LockError);
             }
         }
+        Ok(())
+    }
+
+    fn get_resource_lock(
+        &self,
+        ingredient: &Ingredient
+    ) -> Result<&Arc<Mutex<(u64, u64)>>, CoffeeMakerError> {
+        let resource_lock = self.resources
+            .get(ingredient)
+            .ok_or(CoffeeMakerError::IngredientNotInMap)?;
+        Ok(resource_lock)
+    }
+
+    fn increase_processed_orders(&self) -> Result<(), CoffeeMakerError> {
+        let mut processed = self.orders_processed
+            .write()
+            .map_err(|_| { CoffeeMakerError::LockError })?;
+        *processed += 1;
+        Ok(())
+    }
+
+    fn consume_ingredient(
+        &self,
+        mutex: &mut std::sync::MutexGuard<(u64, u64)>,
+        quantity_required: u64,
+        ingredient: &Ingredient
+    ) {
+        let (mut remaining, mut consumed) = **mutex;
+        debug!(
+            "[DISPENSER {}] Uses {} of {:?}, there is {}",
+            self.id,
+            quantity_required,
+            ingredient,
+            remaining
+        );
+        remaining -= quantity_required;
+        consumed += quantity_required;
+        **mutex = (remaining, consumed);
+        thread::sleep(Duration::from_millis(quantity_required));
+        debug!("[DISPENSER {}] Remains {} of {:?}", self.id, remaining, ingredient);
     }
 }
