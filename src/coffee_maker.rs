@@ -19,7 +19,7 @@ pub mod coffee_maker {
             M_STORAGE,
             N_DISPENSERS,
         },
-        errors::{ CoffeeMakerError, DispenserError, ReplenisherError },
+        errors::CoffeeMakerError,
         container_source_replenisher::container_source_replenisher::ContainerReplenisher,
         external_source_replenisher::external_source_replenisher::ExternalReplenisher,
         statistics::StatisticsPrinter,
@@ -128,7 +128,7 @@ pub mod coffee_maker {
             });
 
             let _replenisher_threads: Vec<
-                JoinHandle<Result<(), ReplenisherError>>
+                JoinHandle<Result<(), CoffeeMakerError>>
             > = self.container_replenishers
                 .iter()
                 .map(|replenisher| {
@@ -147,7 +147,7 @@ pub mod coffee_maker {
                 statistics_printer_clone.print_statistics();
             });
 
-            let dispenser_threads: Vec<JoinHandle<Result<(), DispenserError>>> = self.dispensers
+            let dispenser_threads: Vec<JoinHandle<Result<(), CoffeeMakerError>>> = self.dispensers
                 .iter()
                 .map(|dispenser| {
                     let dispenser_clone = dispenser.clone();

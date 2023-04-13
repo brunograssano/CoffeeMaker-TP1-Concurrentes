@@ -3,7 +3,7 @@ pub(crate) mod container_source_replenisher {
 
     use crate::{
         order::order::Ingredient,
-        errors::ReplenisherError,
+        errors::CoffeeMakerError,
         constants::constants::{ REPLENISH_LIMIT, MINIMUM_WAIT_TIME_REPLENISHER },
     };
 
@@ -39,12 +39,12 @@ pub(crate) mod container_source_replenisher {
                 finish: Arc::new(RwLock::new(false)),
             }
         }
-        pub fn replenish_container(&self) -> Result<(), ReplenisherError> {
+        pub fn replenish_container(&self) -> Result<(), CoffeeMakerError> {
             loop {
                 if let Ok(lock) = self.dest_container_lock.lock() {
                     let mut mutex = self.replenisher_cond
                         .wait_while(lock, |(remaining, _)| { *remaining > REPLENISH_LIMIT })
-                        .map_err(|_| { ReplenisherError::LockError })?;
+                        .map_err(|_| { CoffeeMakerError::LockError })?;
 
                     if *self.finish.read()? {
                         // TODO
@@ -69,15 +69,15 @@ pub(crate) mod container_source_replenisher {
                         "[ERROR] Error while taking the resource {:?} lock",
                         self.destination_ingredient
                     );
-                    return Err(ReplenisherError::LockError);
+                    return Err(CoffeeMakerError::LockError);
                 }
             }
         }
 
-        fn take_resource_from_source(&self, dest_remaining: u64) -> Result<u64, ReplenisherError> {
+        fn take_resource_from_source(&self, dest_remaining: u64) -> Result<u64, CoffeeMakerError> {
             let mut mutex = self.source_container_lock
                 .lock()
-                .map_err(|_| { ReplenisherError::LockError })?;
+                .map_err(|_| { CoffeeMakerError::LockError })?;
             let (mut source_remaining, mut consumed) = *mutex;
             let replenish_quantity = min(
                 self.max_storage_of_container - dest_remaining,

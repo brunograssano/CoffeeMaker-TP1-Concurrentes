@@ -8,7 +8,7 @@ pub mod dispenser {
 
     use std_semaphore::Semaphore;
 
-    use crate::{ order::order::{ Order, Ingredient }, errors::DispenserError };
+    use crate::{ order::order::{ Order, Ingredient }, errors::CoffeeMakerError };
 
     pub struct Dispenser {
         id: usize,
@@ -43,13 +43,13 @@ pub mod dispenser {
             }
         }
 
-        pub fn handle_orders(&self) -> Result<(), DispenserError> {
+        pub fn handle_orders(&self) -> Result<(), CoffeeMakerError> {
             loop {
                 self.orders_to_take.acquire();
 
                 let order = {
                     let mut orders = self.orders_list.write()?;
-                    orders.pop_front().ok_or(DispenserError::EmptyQueueWhenNotExpected)?
+                    orders.pop_front().ok_or(CoffeeMakerError::EmptyQueueWhenNotExpected)?
                 };
 
                 println!("[DISPENSER {}] Takes order {}", self.id, order.id);
@@ -57,7 +57,7 @@ pub mod dispenser {
                 for (ingredient, quantity_required) in order.ingredients {
                     let resource_lock = self.resources
                         .get(&ingredient)
-                        .ok_or(DispenserError::IngredientNotInMap)?;
+                        .ok_or(CoffeeMakerError::IngredientNotInMap)?;
                     if let Ok(lock) = resource_lock.lock() {
                         println!(
                             "[DISPENSER {}] Takes access to container of {:?}",
@@ -78,7 +78,7 @@ pub mod dispenser {
                                 }
                                 need_to_wake_up_replenisher
                             })
-                            .map_err(|_| { DispenserError::LockError })?;
+                            .map_err(|_| { CoffeeMakerError::LockError })?;
                         let (mut remaining, mut consumed) = *mutex;
                         println!(
                             "[DISPENSER {}] Uses {} of {:?}, there is {}",
@@ -99,14 +99,14 @@ pub mod dispenser {
                         );
                     } else {
                         println!("[ERROR] Error while taking the resource {:?} lock", ingredient);
-                        return Err(DispenserError::LockError);
+                        return Err(CoffeeMakerError::LockError);
                     }
                 }
 
                 {
                     let mut processed = self.orders_processed
                         .write()
-                        .map_err(|_| { DispenserError::LockError })?;
+                        .map_err(|_| { CoffeeMakerError::LockError })?;
                     *processed += 1;
                 }
 
