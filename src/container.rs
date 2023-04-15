@@ -6,6 +6,10 @@ pub struct Container {
 
 impl Container {
     pub fn new(initial_capacity: u64) -> Container {
-        Container { remaining: initial_capacity, consumed: 0, finished: false }
+        Container {
+            remaining: initial_capacity,
+            consumed: 0,
+            finished: false,
+        }
     }
 }

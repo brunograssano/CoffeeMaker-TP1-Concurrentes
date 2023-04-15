@@ -1,12 +1,15 @@
-use std::{ sync::{ Arc, Mutex, RwLock }, collections::HashMap, time::Duration, thread };
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex, RwLock},
+    thread,
+    time::Duration,
+};
 
 use log::error;
 
 use crate::{
+    constants::STATISTICS_WAIT_IN_MS, container::Container, errors::CoffeeMakerError,
     order::Ingredient,
-    errors::CoffeeMakerError,
-    constants::STATISTICS_WAIT_IN_MS,
-    container::Container,
 };
 
 pub struct StatisticsPrinter {
@@ -18,7 +21,7 @@ pub struct StatisticsPrinter {
 impl StatisticsPrinter {
     pub fn new(
         processed: Arc<RwLock<u64>>,
-        resources: Arc<HashMap<Ingredient, Arc<Mutex<Container>>>>
+        resources: Arc<HashMap<Ingredient, Arc<Mutex<Container>>>>,
     ) -> StatisticsPrinter {
         StatisticsPrinter {
             processed,
@@ -50,8 +53,10 @@ impl StatisticsPrinter {
 
     fn print_statistics(&self) -> Result<(), CoffeeMakerError> {
         let orders_processed = self.get_orders_processed()?;
-        let mut statistics =
-            format!("[STATISTICS] Orders processed={} | Ingredient=(remaining, consumed) |", orders_processed);
+        let mut statistics = format!(
+            "[STATISTICS] Orders processed={} | Ingredient=(remaining, consumed) |",
+            orders_processed
+        );
         self.add_resources_to_statistics_string(&mut statistics)?;
         println!("{}", statistics);
         Ok(())
@@ -59,19 +64,25 @@ impl StatisticsPrinter {
 
     fn add_resources_to_statistics_string(
         &self,
-        statistics: &mut String
+        statistics: &mut String,
     ) -> Result<(), CoffeeMakerError> {
         for (ingredient, container_lock) in self.resources.iter() {
-            let container = container_lock.lock().map_err(|_| { CoffeeMakerError::LockError })?;
-            statistics.push_str(
-                &format!(" {:?}=({},{}) ", ingredient, container.remaining, container.consumed)
-            );
+            let container = container_lock
+                .lock()
+                .map_err(|_| CoffeeMakerError::LockError)?;
+            statistics.push_str(&format!(
+                " {:?}=({},{}) ",
+                ingredient, container.remaining, container.consumed
+            ));
         }
         Ok(())
     }
 
     fn get_orders_processed(&self) -> Result<u64, CoffeeMakerError> {
-        let processed = *self.processed.read().map_err(|_| { CoffeeMakerError::LockError })?;
+        let processed = *self
+            .processed
+            .read()
+            .map_err(|_| CoffeeMakerError::LockError)?;
         Ok(processed)
     }
 }

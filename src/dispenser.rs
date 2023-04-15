@@ -1,12 +1,17 @@
-use std::{ sync::{ Arc, RwLock, Condvar, Mutex }, collections::HashMap, time::Duration, thread };
+use std::{
+    collections::HashMap,
+    sync::{Arc, Condvar, Mutex, RwLock},
+    thread,
+    time::Duration,
+};
 
-use log::{ debug, info, error };
+use log::{debug, error, info};
 
 use crate::{
-    order::{ Order, Ingredient },
-    errors::CoffeeMakerError,
-    orders_queue::OrdersQueue,
     container::Container,
+    errors::CoffeeMakerError,
+    order::{Ingredient, Order},
+    orders_queue::OrdersQueue,
 };
 
 pub struct Dispenser {
@@ -27,7 +32,7 @@ impl Dispenser {
         replenisher: Arc<Condvar>,
         ingredients_available: Arc<Condvar>,
         resources: Arc<HashMap<Ingredient, Arc<Mutex<Container>>>>,
-        orders_processed: Arc<RwLock<u64>>
+        orders_processed: Arc<RwLock<u64>>,
     ) -> Dispenser {
         Dispenser {
             id,
@@ -43,15 +48,19 @@ impl Dispenser {
     pub fn handle_orders(&self) -> Result<(), CoffeeMakerError> {
         loop {
             let order = {
-                let mut orders = self.orders_to_take.wait_while(self.orders_list.lock()?, |queue| {
-                    queue.is_empty() && !queue.finished
-                })?;
+                let mut orders = self
+                    .orders_to_take
+                    .wait_while(self.orders_list.lock()?, |queue| {
+                        queue.is_empty() && !queue.finished
+                    })?;
 
                 if orders.is_empty() && orders.finished {
                     return Ok(());
                 }
 
-                orders.pop().ok_or(CoffeeMakerError::EmptyQueueWhenNotExpected)?
+                orders
+                    .pop()
+                    .ok_or(CoffeeMakerError::EmptyQueueWhenNotExpected)?
             };
 
             debug!("[DISPENSER {}] Takes order {}", self.id, order.id);
@@ -64,7 +73,10 @@ impl Dispenser {
         for (ingredient, quantity_required) in order.ingredients {
             let resource_lock = self.get_resource_lock(&ingredient)?;
             if let Ok(lock) = resource_lock.lock() {
-                debug!("[DISPENSER {}] Takes access to container of {:?}", self.id, ingredient);
+                debug!(
+                    "[DISPENSER {}] Takes access to container of {:?}",
+                    self.id, ingredient
+                );
                 let mut mutex = self.ingredients_available
                     .wait_while(lock, |container| {
                         let need_to_wake_up_replenisher = container.remaining < quantity_required;
@@ -81,7 +93,10 @@ impl Dispenser {
                     .map_err(|_| { CoffeeMakerError::LockError })?;
                 self.consume_ingredient(&mut mutex, quantity_required, &ingredient);
             } else {
-                error!("[ERROR] Error while taking the resource {:?} lock", ingredient);
+                error!(
+                    "[ERROR] Error while taking the resource {:?} lock",
+                    ingredient
+                );
                 return Err(CoffeeMakerError::LockError);
             }
         }
@@ -90,18 +105,20 @@ impl Dispenser {
 
     fn get_resource_lock(
         &self,
-        ingredient: &Ingredient
+        ingredient: &Ingredient,
     ) -> Result<&Arc<Mutex<Container>>, CoffeeMakerError> {
-        let resource_lock = self.resources
+        let resource_lock = self
+            .resources
             .get(ingredient)
             .ok_or(CoffeeMakerError::IngredientNotInMap)?;
         Ok(resource_lock)
     }
 
     fn increase_processed_orders(&self) -> Result<(), CoffeeMakerError> {
-        let mut processed = self.orders_processed
+        let mut processed = self
+            .orders_processed
             .write()
-            .map_err(|_| { CoffeeMakerError::LockError })?;
+            .map_err(|_| CoffeeMakerError::LockError)?;
         *processed += 1;
         Ok(())
     }
@@ -110,18 +127,18 @@ impl Dispenser {
         &self,
         mutex: &mut std::sync::MutexGuard<Container>,
         quantity_required: u64,
-        ingredient: &Ingredient
+        ingredient: &Ingredient,
     ) {
         debug!(
             "[DISPENSER {}] Uses {} of {:?}, there is {}",
-            self.id,
-            quantity_required,
-            ingredient,
-            mutex.remaining
+            self.id, quantity_required, ingredient, mutex.remaining
         );
         mutex.remaining -= quantity_required;
         mutex.consumed += quantity_required;
         thread::sleep(Duration::from_millis(quantity_required));
-        debug!("[DISPENSER {}] Remains {} of {:?}", self.id, mutex.remaining, ingredient);
+        debug!(
+            "[DISPENSER {}] Remains {} of {:?}",
+            self.id, mutex.remaining, ingredient
+        );
     }
 }

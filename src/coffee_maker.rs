@@ -1,20 +1,20 @@
 use std::{
-    thread::{ JoinHandle, self },
-    collections::{ VecDeque, HashMap },
-    sync::{ Arc, RwLock, Condvar, Mutex },
+    collections::HashMap,
+    sync::{ Arc, Condvar, Mutex, RwLock },
+    thread::{ self, JoinHandle },
 };
 
 use crate::{
-    orders_reader::read_and_add_orders,
-    order::{ Order, Ingredient, TOTAL_INGREDIENTS },
-    dispenser::{ Dispenser },
-    constants::{ L_STORAGE, E_STORAGE, C_STORAGE, A_STORAGE, G_STORAGE, M_STORAGE, N_DISPENSERS },
-    errors::CoffeeMakerError,
-    container_source_replenisher::ContainerReplenisher,
-    external_source_replenisher::ExternalReplenisher,
-    statistics::StatisticsPrinter,
-    orders_queue::OrdersQueue,
+    constants::{ A_STORAGE, C_STORAGE, E_STORAGE, G_STORAGE, L_STORAGE, M_STORAGE, N_DISPENSERS },
     container::Container,
+    container_source_replenisher::ContainerReplenisher,
+    dispenser::Dispenser,
+    errors::CoffeeMakerError,
+    external_source_replenisher::ExternalReplenisher,
+    order::{ Ingredient, TOTAL_INGREDIENTS },
+    orders_queue::OrdersQueue,
+    orders_reader::read_and_add_orders,
+    statistics::StatisticsPrinter,
 };
 
 pub struct CoffeeMaker {
@@ -140,19 +140,19 @@ impl CoffeeMaker {
             .iter()
             .map(|replenisher| {
                 let replenisher_clone = replenisher.clone();
-                thread::spawn(move || { replenisher_clone.replenish_container() })
+                thread::spawn(move || replenisher_clone.replenish_container())
             })
             .collect()
     }
 
     fn create_water_replenisher_thread(&self) -> JoinHandle<Result<(), CoffeeMakerError>> {
         let water_replenisher_clone = self.water_replenisher.clone();
-        thread::spawn(move || { water_replenisher_clone.replenish_container() })
+        thread::spawn(move || water_replenisher_clone.replenish_container())
     }
 
     fn create_statistics_thread(&self) -> JoinHandle<Result<(), CoffeeMakerError>> {
         let statistics_printer_clone = self.statistics_printer.clone();
-        thread::spawn(move || { statistics_printer_clone.process_statistics() })
+        thread::spawn(move || statistics_printer_clone.process_statistics())
     }
 
     fn create_dispenser_threads(&self) -> Vec<JoinHandle<Result<(), CoffeeMakerError>>> {
@@ -160,7 +160,7 @@ impl CoffeeMaker {
             .iter()
             .map(|dispenser| {
                 let dispenser_clone = dispenser.clone();
-                thread::spawn(move || { dispenser_clone.handle_orders() })
+                thread::spawn(move || dispenser_clone.handle_orders())
             })
             .collect()
     }

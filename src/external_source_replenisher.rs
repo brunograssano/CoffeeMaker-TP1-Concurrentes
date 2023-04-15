@@ -1,12 +1,16 @@
-use std::{ sync::{ Condvar, Arc, RwLock, Mutex }, thread, time::Duration };
+use std::{
+    sync::{Arc, Condvar, Mutex},
+    thread,
+    time::Duration,
+};
 
-use log::{ info, error };
+use log::{error, info};
 
 use crate::{
-    order::Ingredient,
-    errors::CoffeeMakerError,
-    constants::{ REPLENISH_LIMIT, MINIMUM_WAIT_TIME_REPLENISHER },
+    constants::{MINIMUM_WAIT_TIME_REPLENISHER, REPLENISH_LIMIT},
     container::Container,
+    errors::CoffeeMakerError,
+    order::Ingredient,
 };
 
 pub struct ExternalReplenisher {
@@ -22,7 +26,7 @@ impl ExternalReplenisher {
         container: (Ingredient, Arc<Mutex<Container>>),
         replenisher_cond: Arc<Condvar>,
         ingredients_cond: Arc<Condvar>,
-        max_storage_of_container: u64
+        max_storage_of_container: u64,
     ) -> ExternalReplenisher {
         let (ingredient, container_lock) = container;
         ExternalReplenisher {
@@ -46,11 +50,12 @@ impl ExternalReplenisher {
     pub fn replenish_container(&self) -> Result<(), CoffeeMakerError> {
         loop {
             if let Ok(lock) = self.container_lock.lock() {
-                let mut mutex = self.replenisher_cond
+                let mut mutex = self
+                    .replenisher_cond
                     .wait_while(lock, |container| {
                         container.remaining > REPLENISH_LIMIT && !container.finished
                     })
-                    .map_err(|_| { CoffeeMakerError::LockError })?;
+                    .map_err(|_| CoffeeMakerError::LockError)?;
 
                 if mutex.finished {
                     return Ok(());
@@ -58,7 +63,10 @@ impl ExternalReplenisher {
                 self.replenish(&mut mutex);
                 self.ingredients_cond.notify_all();
             } else {
-                error!("[REPLENISHER] Error while taking the resource {:?} lock", self.ingredient);
+                error!(
+                    "[REPLENISHER] Error while taking the resource {:?} lock",
+                    self.ingredient
+                );
                 return Err(CoffeeMakerError::LockError);
             }
         }
@@ -67,11 +75,12 @@ impl ExternalReplenisher {
     fn replenish(&self, mutex: &mut std::sync::MutexGuard<Container>) {
         let replenish_quantity = self.max_storage_of_container - mutex.remaining;
         mutex.remaining += replenish_quantity;
-        thread::sleep(Duration::from_millis(MINIMUM_WAIT_TIME_REPLENISHER + replenish_quantity));
+        thread::sleep(Duration::from_millis(
+            MINIMUM_WAIT_TIME_REPLENISHER + replenish_quantity,
+        ));
         info!(
             "[REPLENISHER] Replenished {:?} with {} from external source",
-            self.ingredient,
-            replenish_quantity
+            self.ingredient, replenish_quantity
         );
     }
 }

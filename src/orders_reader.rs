@@ -1,16 +1,16 @@
-use log::{ info, error, debug };
-use std::{ error::Error };
+use log::{debug, error, info};
+use serde::Deserialize;
+use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use std::sync::{ Arc, Mutex, Condvar };
-use serde::Deserialize;
+use std::sync::{Arc, Condvar, Mutex};
 
-use rand::{ thread_rng };
 use rand::seq::SliceRandom;
+use rand::thread_rng;
 
 use crate::errors::CoffeeMakerError;
-use crate::order::{ Ingredient, Order };
+use crate::order::{Ingredient, Order};
 use crate::orders_queue::OrdersQueue;
 
 #[derive(Deserialize, Debug)]
@@ -36,7 +36,7 @@ fn read_orders_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<JsonOrder>, Box<
 fn add_orders_to_list(
     json_orders: Vec<JsonOrder>,
     orders_queue_lock: Arc<Mutex<OrdersQueue>>,
-    orders_cond: Arc<Condvar>
+    orders_cond: Arc<Condvar>,
 ) -> Result<(), CoffeeMakerError> {
     let mut id = 0;
     for order in json_orders {
@@ -81,7 +81,7 @@ fn get_ingredients_from_order(order: JsonOrder) -> Vec<(Ingredient, u64)> {
 pub fn read_and_add_orders<P: AsRef<Path>>(
     order_list: Arc<Mutex<OrdersQueue>>,
     orders_cond: Arc<Condvar>,
-    path: P
+    path: P,
 ) -> Result<(), CoffeeMakerError> {
     let result = read_orders_from_file(path);
     match result {

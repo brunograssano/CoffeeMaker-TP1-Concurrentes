@@ -9,7 +9,10 @@ pub struct OrdersQueue {
 
 impl OrdersQueue {
     pub fn new() -> OrdersQueue {
-        OrdersQueue { orders: VecDeque::new(), finished: false }
+        OrdersQueue {
+            orders: VecDeque::new(),
+            finished: false,
+        }
     }
 
     pub fn push(&mut self, order: Order) {

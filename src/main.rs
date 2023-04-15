@@ -1,14 +1,14 @@
-pub mod orders_reader;
-pub mod order;
-pub mod dispenser;
 pub mod coffee_maker;
-pub mod errors;
 pub mod constants;
-pub mod external_source_replenisher;
-pub mod container_source_replenisher;
-pub mod statistics;
-pub mod orders_queue;
 pub mod container;
+pub mod container_source_replenisher;
+pub mod dispenser;
+pub mod errors;
+pub mod external_source_replenisher;
+pub mod order;
+pub mod orders_queue;
+pub mod orders_reader;
+pub mod statistics;
 
 use coffee_maker::CoffeeMaker;
 
