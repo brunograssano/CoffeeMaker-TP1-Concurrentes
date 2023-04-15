@@ -2,18 +2,23 @@ use std::{ sync::{ Arc, Mutex, RwLock }, collections::HashMap, time::Duration, t
 
 use log::error;
 
-use crate::{ order::Ingredient, errors::CoffeeMakerError, constants::STATISTICS_WAIT_IN_MS };
+use crate::{
+    order::Ingredient,
+    errors::CoffeeMakerError,
+    constants::STATISTICS_WAIT_IN_MS,
+    container::Container,
+};
 
 pub struct StatisticsPrinter {
     processed: Arc<RwLock<u64>>,
-    resources: Arc<HashMap<Ingredient, Arc<Mutex<(u64, u64)>>>>,
+    resources: Arc<HashMap<Ingredient, Arc<Mutex<Container>>>>,
     finish: Arc<Mutex<bool>>,
 }
 
 impl StatisticsPrinter {
     pub fn new(
         processed: Arc<RwLock<u64>>,
-        resources: Arc<HashMap<Ingredient, Arc<Mutex<(u64, u64)>>>>
+        resources: Arc<HashMap<Ingredient, Arc<Mutex<Container>>>>
     ) -> StatisticsPrinter {
         StatisticsPrinter {
             processed,
@@ -42,10 +47,10 @@ impl StatisticsPrinter {
             let mut statistics =
                 format!("[STATISTICS] Orders processed={} | Ingredient=(remaining, consumed) |", orders_processed);
             for (ingredient, container_lock) in self.resources.iter() {
-                let (remaining, consumed) = {
-                    *container_lock.lock().map_err(|_| { CoffeeMakerError::LockError })?
-                };
-                statistics.push_str(&format!(" {:?}=({},{}) ", ingredient, remaining, consumed));
+                let container = container_lock.lock().map_err(|_| { CoffeeMakerError::LockError })?;
+                statistics.push_str(
+                    &format!(" {:?}=({},{}) ", ingredient, container.remaining, container.consumed)
+                );
             }
 
             println!("{}", statistics);

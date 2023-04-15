@@ -14,6 +14,7 @@ use crate::{
     external_source_replenisher::ExternalReplenisher,
     statistics::StatisticsPrinter,
     orders_queue::OrdersQueue,
+    container::Container,
 };
 
 pub struct CoffeeMaker {
@@ -28,17 +29,17 @@ pub struct CoffeeMaker {
 impl CoffeeMaker {
     pub fn new() -> CoffeeMaker {
         let mut resources = HashMap::with_capacity(TOTAL_INGREDIENTS);
-        let cold_milk = Arc::new(Mutex::new((L_STORAGE, 0)));
-        let milk_foam = Arc::new(Mutex::new((E_STORAGE, 0)));
-        let hot_water = Arc::new(Mutex::new((A_STORAGE, 0)));
-        let grains_to_grind = Arc::new(Mutex::new((G_STORAGE, 0)));
-        let ground_coffee = Arc::new(Mutex::new((M_STORAGE, 0)));
+        let cold_milk = Arc::new(Mutex::new(Container::new(L_STORAGE)));
+        let milk_foam = Arc::new(Mutex::new(Container::new(E_STORAGE)));
+        let hot_water = Arc::new(Mutex::new(Container::new(A_STORAGE)));
+        let grains_to_grind = Arc::new(Mutex::new(Container::new(G_STORAGE)));
+        let ground_coffee = Arc::new(Mutex::new(Container::new(M_STORAGE)));
         resources.insert(Ingredient::ColdMilk, cold_milk.clone());
         resources.insert(Ingredient::MilkFoam, milk_foam.clone());
         resources.insert(Ingredient::HotWater, hot_water.clone());
         resources.insert(Ingredient::GrainsToGrind, grains_to_grind.clone());
         resources.insert(Ingredient::GroundCoffee, ground_coffee.clone());
-        resources.insert(Ingredient::Cacao, Arc::new(Mutex::new((C_STORAGE, 0))));
+        resources.insert(Ingredient::Cacao, Arc::new(Mutex::new(Container::new(C_STORAGE))));
 
         let resources = Arc::new(resources);
         let order_list = Arc::new(Mutex::new(OrdersQueue::new()));

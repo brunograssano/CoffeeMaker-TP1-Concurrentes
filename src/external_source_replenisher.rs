@@ -6,11 +6,12 @@ use crate::{
     order::Ingredient,
     errors::CoffeeMakerError,
     constants::{ REPLENISH_LIMIT, MINIMUM_WAIT_TIME_REPLENISHER },
+    container::Container,
 };
 
 pub struct ExternalReplenisher {
     ingredient: Ingredient,
-    container_lock: Arc<Mutex<(u64, u64)>>,
+    container_lock: Arc<Mutex<Container>>,
     replenisher_cond: Arc<Condvar>,
     ingredients_cond: Arc<Condvar>,
     finish: Arc<RwLock<bool>>,
@@ -19,7 +20,7 @@ pub struct ExternalReplenisher {
 
 impl ExternalReplenisher {
     pub fn new(
-        container: (Ingredient, Arc<Mutex<(u64, u64)>>),
+        container: (Ingredient, Arc<Mutex<Container>>),
         replenisher_cond: Arc<Condvar>,
         ingredients_cond: Arc<Condvar>,
         max_storage_of_container: u64
@@ -48,12 +49,12 @@ impl ExternalReplenisher {
         loop {
             if let Ok(lock) = self.container_lock.lock() {
                 let mut mutex = self.replenisher_cond
-                    .wait_while(lock, |(remaining, _)| {
+                    .wait_while(lock, |container| {
                         let mut finish = true;
                         if let Ok(finish_result) = self.finish.read() {
                             finish = *finish_result;
                         }
-                        *remaining > REPLENISH_LIMIT && !finish
+                        container.remaining > REPLENISH_LIMIT && !finish
                     })
                     .map_err(|_| { CoffeeMakerError::LockError })?;
 
@@ -69,11 +70,9 @@ impl ExternalReplenisher {
         }
     }
 
-    fn replenish(&self, mutex: &mut std::sync::MutexGuard<(u64, u64)>) {
-        let (mut dest_remaining, _) = **mutex;
-        let replenish_quantity = self.max_storage_of_container - dest_remaining;
-        dest_remaining += replenish_quantity;
-        (*mutex).0 = dest_remaining;
+    fn replenish(&self, mutex: &mut std::sync::MutexGuard<Container>) {
+        let replenish_quantity = self.max_storage_of_container - mutex.remaining;
+        mutex.remaining += replenish_quantity;
         thread::sleep(Duration::from_millis(MINIMUM_WAIT_TIME_REPLENISHER + replenish_quantity));
         info!(
             "[REPLENISHER] Replenished {:?} with {} from external source",

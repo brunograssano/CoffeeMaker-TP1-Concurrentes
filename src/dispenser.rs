@@ -7,7 +7,12 @@ use std::{
 
 use log::{ debug, info, error };
 
-use crate::{ order::{ Order, Ingredient }, errors::CoffeeMakerError, orders_queue::OrdersQueue };
+use crate::{
+    order::{ Order, Ingredient },
+    errors::CoffeeMakerError,
+    orders_queue::OrdersQueue,
+    container::Container,
+};
 
 pub struct Dispenser {
     id: usize,
@@ -15,7 +20,7 @@ pub struct Dispenser {
     orders_to_take: Arc<Condvar>,
     replenisher: Arc<Condvar>,
     ingredients_available: Arc<Condvar>,
-    resources: Arc<HashMap<Ingredient, Arc<Mutex<(u64, u64)>>>>,
+    resources: Arc<HashMap<Ingredient, Arc<Mutex<Container>>>>,
     orders_processed: Arc<RwLock<u64>>,
 }
 
@@ -26,7 +31,7 @@ impl Dispenser {
         orders_to_take: Arc<Condvar>,
         replenisher: Arc<Condvar>,
         ingredients_available: Arc<Condvar>,
-        resources: Arc<HashMap<Ingredient, Arc<Mutex<(u64, u64)>>>>,
+        resources: Arc<HashMap<Ingredient, Arc<Mutex<Container>>>>,
         orders_processed: Arc<RwLock<u64>>
     ) -> Dispenser {
         Dispenser {
@@ -67,9 +72,8 @@ impl Dispenser {
             if let Ok(lock) = resource_lock.lock() {
                 debug!("[DISPENSER {}] Takes access to container of {:?}", self.id, ingredient);
                 let mut mutex = self.ingredients_available
-                    .wait_while(lock, |(quantity_in_container, _)| {
-                        let need_to_wake_up_replenisher =
-                            *quantity_in_container < quantity_required;
+                    .wait_while(lock, |container| {
+                        let need_to_wake_up_replenisher = container.remaining < quantity_required;
                         if need_to_wake_up_replenisher {
                             info!(
                                 "[DISPENSER {}] Not enough {:?} for this order, waking up replenisher",
@@ -93,7 +97,7 @@ impl Dispenser {
     fn get_resource_lock(
         &self,
         ingredient: &Ingredient
-    ) -> Result<&Arc<Mutex<(u64, u64)>>, CoffeeMakerError> {
+    ) -> Result<&Arc<Mutex<Container>>, CoffeeMakerError> {
         let resource_lock = self.resources
             .get(ingredient)
             .ok_or(CoffeeMakerError::IngredientNotInMap)?;
@@ -110,22 +114,20 @@ impl Dispenser {
 
     fn consume_ingredient(
         &self,
-        mutex: &mut std::sync::MutexGuard<(u64, u64)>,
+        mutex: &mut std::sync::MutexGuard<Container>,
         quantity_required: u64,
         ingredient: &Ingredient
     ) {
-        let (mut remaining, mut consumed) = **mutex;
         debug!(
             "[DISPENSER {}] Uses {} of {:?}, there is {}",
             self.id,
             quantity_required,
             ingredient,
-            remaining
+            mutex.remaining
         );
-        remaining -= quantity_required;
-        consumed += quantity_required;
-        **mutex = (remaining, consumed);
+        mutex.remaining -= quantity_required;
+        mutex.consumed += quantity_required;
         thread::sleep(Duration::from_millis(quantity_required));
-        debug!("[DISPENSER {}] Remains {} of {:?}", self.id, remaining, ingredient);
+        debug!("[DISPENSER {}] Remains {} of {:?}", self.id, mutex.remaining, ingredient);
     }
 }
