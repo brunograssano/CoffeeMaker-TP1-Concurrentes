@@ -1,17 +1,17 @@
 use std::{
     collections::HashMap,
-    sync::{ Arc, Condvar, Mutex, RwLock },
-    thread::{ self, JoinHandle },
+    sync::{Arc, Condvar, Mutex, RwLock},
+    thread::{self, JoinHandle},
 };
 
 use crate::{
-    constants::{ A_STORAGE, C_STORAGE, E_STORAGE, G_STORAGE, L_STORAGE, M_STORAGE, N_DISPENSERS },
+    constants::{A_STORAGE, C_STORAGE, E_STORAGE, G_STORAGE, L_STORAGE, M_STORAGE, N_DISPENSERS},
     container::Container,
     container_source_replenisher::ContainerReplenisher,
     dispenser::Dispenser,
     errors::CoffeeMakerError,
     external_source_replenisher::ExternalReplenisher,
-    order::{ Ingredient, TOTAL_INGREDIENTS },
+    order::{Ingredient, TOTAL_INGREDIENTS},
     orders_queue::OrdersQueue,
     orders_reader::read_and_add_orders,
     statistics::StatisticsPrinter,
@@ -39,7 +39,10 @@ impl CoffeeMaker {
         resources.insert(Ingredient::HotWater, hot_water.clone());
         resources.insert(Ingredient::GrainsToGrind, grains_to_grind.clone());
         resources.insert(Ingredient::GroundCoffee, ground_coffee.clone());
-        resources.insert(Ingredient::Cacao, Arc::new(Mutex::new(Container::new(C_STORAGE))));
+        resources.insert(
+            Ingredient::Cacao,
+            Arc::new(Mutex::new(Container::new(C_STORAGE))),
+        );
 
         let resources = Arc::new(resources);
         let order_list = Arc::new(Mutex::new(OrdersQueue::new()));
@@ -50,54 +53,42 @@ impl CoffeeMaker {
         let orders_processed = Arc::new(RwLock::new(0));
         let dispensers = (0..N_DISPENSERS)
             .map(|id| {
-                Arc::new(
-                    Dispenser::new(
-                        id,
-                        order_list.clone(),
-                        orders_to_take.clone(),
-                        replenisher_cond.clone(),
-                        ingredients_cond.clone(),
-                        resources.clone(),
-                        orders_processed.clone()
-                    )
-                )
+                Arc::new(Dispenser::new(
+                    id,
+                    order_list.clone(),
+                    orders_to_take.clone(),
+                    replenisher_cond.clone(),
+                    ingredients_cond.clone(),
+                    resources.clone(),
+                    orders_processed.clone(),
+                ))
             })
             .collect::<Vec<Arc<Dispenser>>>();
 
         let mut container_replenishers = Vec::new();
 
-        container_replenishers.push(
-            Arc::new(
-                ContainerReplenisher::new(
-                    (Ingredient::GrainsToGrind, grains_to_grind.clone()),
-                    (Ingredient::GroundCoffee, ground_coffee.clone()),
-                    replenisher_cond.clone(),
-                    ingredients_cond.clone(),
-                    M_STORAGE
-                )
-            )
-        );
+        container_replenishers.push(Arc::new(ContainerReplenisher::new(
+            (Ingredient::GrainsToGrind, grains_to_grind.clone()),
+            (Ingredient::GroundCoffee, ground_coffee.clone()),
+            replenisher_cond.clone(),
+            ingredients_cond.clone(),
+            M_STORAGE,
+        )));
 
-        container_replenishers.push(
-            Arc::new(
-                ContainerReplenisher::new(
-                    (Ingredient::ColdMilk, cold_milk.clone()),
-                    (Ingredient::MilkFoam, milk_foam.clone()),
-                    replenisher_cond.clone(),
-                    ingredients_cond.clone(),
-                    E_STORAGE
-                )
-            )
-        );
+        container_replenishers.push(Arc::new(ContainerReplenisher::new(
+            (Ingredient::ColdMilk, cold_milk.clone()),
+            (Ingredient::MilkFoam, milk_foam.clone()),
+            replenisher_cond.clone(),
+            ingredients_cond.clone(),
+            E_STORAGE,
+        )));
 
-        let water_replenisher = Arc::new(
-            ExternalReplenisher::new(
-                (Ingredient::HotWater, hot_water.clone()),
-                replenisher_cond.clone(),
-                ingredients_cond.clone(),
-                A_STORAGE
-            )
-        );
+        let water_replenisher = Arc::new(ExternalReplenisher::new(
+            (Ingredient::HotWater, hot_water.clone()),
+            replenisher_cond.clone(),
+            ingredients_cond.clone(),
+            A_STORAGE,
+        ));
 
         CoffeeMaker {
             order_list,
@@ -105,9 +96,10 @@ impl CoffeeMaker {
             dispensers,
             container_replenishers,
             water_replenisher,
-            statistics_printer: Arc::new(
-                StatisticsPrinter::new(orders_processed.clone(), resources.clone())
-            ),
+            statistics_printer: Arc::new(StatisticsPrinter::new(
+                orders_processed.clone(),
+                resources.clone(),
+            )),
         }
     }
 
@@ -134,7 +126,7 @@ impl CoffeeMaker {
     }
 
     fn create_container_replenisher_threads(
-        &self
+        &self,
     ) -> Vec<JoinHandle<Result<(), CoffeeMakerError>>> {
         self.container_replenishers
             .iter()
@@ -167,7 +159,7 @@ impl CoffeeMaker {
 
     fn wait_for_statistics_thread(
         &self,
-        statistics_thread: JoinHandle<Result<(), CoffeeMakerError>>
+        statistics_thread: JoinHandle<Result<(), CoffeeMakerError>>,
     ) {
         self.statistics_printer.finish();
         if let Err(err) = statistics_thread.join() {
@@ -178,7 +170,7 @@ impl CoffeeMaker {
     fn wait_for_replenishers(
         &self,
         replenisher_threads: Vec<JoinHandle<Result<(), CoffeeMakerError>>>,
-        water_replenisher_thread: JoinHandle<Result<(), CoffeeMakerError>>
+        water_replenisher_thread: JoinHandle<Result<(), CoffeeMakerError>>,
     ) {
         self.signal_replenishers_to_finish();
 

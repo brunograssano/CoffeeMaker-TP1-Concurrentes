@@ -13,6 +13,9 @@ pub mod statistics;
 use coffee_maker::CoffeeMaker;
 
 fn main() {
+    if let Err(err) = simple_logger::init_with_env() {
+        println!("Error setting logger: {:?}", err); // RUST_LOG=info to set
+    }
     let coffee_maker = CoffeeMaker::new();
     coffee_maker.manage_orders();
 }

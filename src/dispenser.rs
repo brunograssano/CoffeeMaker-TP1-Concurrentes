@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use log::{debug, error, info};
+use log::{debug, info};
 
 use crate::{
     container::Container,
@@ -65,42 +65,50 @@ impl Dispenser {
 
             debug!("[DISPENSER {}] Takes order {}", self.id, order.id);
             self.process_order(order)?;
-            self.increase_processed_orders()?;
         }
     }
 
     fn process_order(&self, order: Order) -> Result<(), CoffeeMakerError> {
         for (ingredient, quantity_required) in order.ingredients {
             let resource_lock = self.get_resource_lock(&ingredient)?;
-            if let Ok(lock) = resource_lock.lock() {
-                debug!(
-                    "[DISPENSER {}] Takes access to container of {:?}",
-                    self.id, ingredient
+
+            let mut container = self
+                .ingredients_available
+                .wait_while(resource_lock.lock()?, |container| {
+                    self.should_wake_replenisher(container, quantity_required, &ingredient)
+                })
+                .map_err(|_| CoffeeMakerError::LockError)?;
+            if container.remaining < quantity_required {
+                info!(
+                    "[DISPENSER {}] Skipped order {}, not enough {:?}",
+                    self.id, order.id, ingredient
                 );
-                let mut mutex = self.ingredients_available
-                    .wait_while(lock, |container| {
-                        let need_to_wake_up_replenisher = container.remaining < quantity_required;
-                        if need_to_wake_up_replenisher {
-                            info!(
-                                "[DISPENSER {}] Not enough {:?} for this order, waking up replenisher",
-                                self.id,
-                                ingredient
-                            );
-                            self.replenisher.notify_all();
-                        }
-                        need_to_wake_up_replenisher
-                    })
-                    .map_err(|_| { CoffeeMakerError::LockError })?;
-                self.consume_ingredient(&mut mutex, quantity_required, &ingredient);
-            } else {
-                error!(
-                    "[ERROR] Error while taking the resource {:?} lock",
-                    ingredient
-                );
-                return Err(CoffeeMakerError::LockError);
+                return Ok(());
             }
+            self.consume_ingredient(&mut container, quantity_required, &ingredient);
         }
+        self.increase_processed_orders()?;
         Ok(())
+    }
+
+    fn should_wake_replenisher(
+        &self,
+        container: &Container,
+        quantity_required: u64,
+        ingredient: &Ingredient,
+    ) -> bool {
+        if container.finished || has_no_replenisher(ingredient) {
+            return false;
+        }
+        let need_more_resource = container.remaining < quantity_required;
+        if need_more_resource {
+            info!(
+                "[DISPENSER {}] Not enough {:?} for this order, waking up replenisher",
+                self.id, ingredient
+            );
+            self.replenisher.notify_all();
+        }
+        need_more_resource
     }
 
     fn get_resource_lock(
@@ -141,4 +149,8 @@ impl Dispenser {
             self.id, mutex.remaining, ingredient
         );
     }
+}
+
+fn has_no_replenisher(ingredient: &Ingredient) -> bool {
+    *ingredient == Ingredient::Cacao
 }

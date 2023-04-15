@@ -12,4 +12,8 @@ impl Container {
             finished: false,
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.remaining == 0
+    }
 }

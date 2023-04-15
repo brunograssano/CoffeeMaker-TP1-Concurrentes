@@ -56,35 +56,29 @@ impl ContainerReplenisher {
 
     pub fn replenish_container(&self) -> Result<(), CoffeeMakerError> {
         loop {
-            if let Ok(lock) = self.dest_container_lock.lock() {
-                let mut mutex = self
-                    .replenisher_cond
-                    .wait_while(lock, |container| {
-                        container.remaining > REPLENISH_LIMIT && !container.finished
-                    })
-                    .map_err(|_| CoffeeMakerError::LockError)?;
+            let mut dest_container = self
+                .replenisher_cond
+                .wait_while(self.dest_container_lock.lock()?, |container| {
+                    container.remaining > REPLENISH_LIMIT && !container.finished
+                })
+                .map_err(|_| CoffeeMakerError::LockError)?;
 
-                if mutex.finished {
-                    return Ok(());
-                }
-                self.replenish(&mut mutex)?;
-                self.ingredients_cond.notify_all();
-            } else {
-                error!(
-                    "[ERROR] Error while taking the resource {:?} lock",
-                    self.destination_ingredient
-                );
-                return Err(CoffeeMakerError::LockError);
+            if dest_container.finished {
+                return Ok(());
             }
+            self.replenish(&mut dest_container)?;
+            self.ingredients_cond.notify_all();
         }
     }
 
     fn replenish(
         &self,
-        mutex: &mut std::sync::MutexGuard<Container>,
+        dest_container: &mut std::sync::MutexGuard<Container>,
     ) -> Result<(), CoffeeMakerError> {
-        let replenish_quantity = self.take_resource_from_source(mutex.remaining)?;
-        mutex.remaining += replenish_quantity;
+        let (replenish_quantity, source_is_empty) =
+            self.take_resource_from_source(dest_container.remaining)?;
+        dest_container.remaining += replenish_quantity;
+        dest_container.finished = source_is_empty;
         thread::sleep(Duration::from_millis(
             MINIMUM_WAIT_TIME_REPLENISHER + replenish_quantity,
         ));
@@ -95,19 +89,26 @@ impl ContainerReplenisher {
         Ok(())
     }
 
-    fn take_resource_from_source(&self, dest_remaining: u64) -> Result<u64, CoffeeMakerError> {
-        let mut mutex = self
+    fn take_resource_from_source(
+        &self,
+        dest_remaining: u64,
+    ) -> Result<(u64, bool), CoffeeMakerError> {
+        let mut source_container = self
             .source_container_lock
             .lock()
             .map_err(|_| CoffeeMakerError::LockError)?;
         let replenish_quantity = min(
             self.max_storage_of_container - dest_remaining,
-            mutex.remaining,
+            source_container.remaining,
         );
 
-        // TODO Que pasa si se vacia el contenedor de origen?
-        mutex.remaining -= replenish_quantity;
-        mutex.consumed += replenish_quantity;
-        Ok(replenish_quantity)
+        source_container.remaining -= replenish_quantity;
+        source_container.consumed += replenish_quantity;
+
+        let mut source_is_empty = false;
+        if source_container.is_empty() {
+            source_is_empty = true;
+        }
+        Ok((replenish_quantity, source_is_empty))
     }
 }
