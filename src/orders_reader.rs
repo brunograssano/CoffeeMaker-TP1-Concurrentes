@@ -1,5 +1,5 @@
 use log::{ info, error, debug };
-use std::{ error::Error, collections::VecDeque };
+use std::{ error::Error };
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -11,6 +11,7 @@ use rand::seq::SliceRandom;
 
 use crate::errors::CoffeeMakerError;
 use crate::order::{ Ingredient, Order };
+use crate::orders_queue::OrdersQueue;
 
 #[derive(Deserialize, Debug)]
 struct JsonOrder {
@@ -34,24 +35,29 @@ fn read_orders_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<JsonOrder>, Box<
 
 fn add_orders_to_list(
     json_orders: Vec<JsonOrder>,
-    orders_queue_lock: Arc<Mutex<VecDeque<Order>>>,
-    order_semaphore: Arc<Condvar>
+    orders_queue_lock: Arc<Mutex<OrdersQueue>>,
+    orders_cond: Arc<Condvar>
 ) -> Result<(), CoffeeMakerError> {
     let mut id = 0;
     for order in json_orders {
         let ingredients = get_ingredients_from_order(order);
-        if let Ok(mut orders_queue) = orders_queue_lock.lock() {
-            orders_queue.push_back(Order::new(id, ingredients));
+        if let Ok(mut queue) = orders_queue_lock.lock() {
+            queue.push(Order::new(id, ingredients));
             debug!("[READER] Added order {}", id);
             id += 1;
-            order_semaphore.notify_all();
+            orders_cond.notify_all();
         } else {
             error!("[READER] Error while taking the queue lock");
             return Err(CoffeeMakerError::LockError);
         }
     }
     info!("[READER] No more orders left");
-    Ok(())
+    if let Ok(mut queue) = orders_queue_lock.lock() {
+        queue.finished = true;
+        orders_cond.notify_all();
+        return Ok(());
+    }
+    Err(CoffeeMakerError::LockError)
 }
 
 fn get_ingredients_from_order(order: JsonOrder) -> Vec<(Ingredient, u64)> {
@@ -73,13 +79,13 @@ fn get_ingredients_from_order(order: JsonOrder) -> Vec<(Ingredient, u64)> {
 }
 
 pub fn read_and_add_orders<P: AsRef<Path>>(
-    order_list: Arc<Mutex<VecDeque<Order>>>,
-    order_semaphore: Arc<Condvar>,
+    order_list: Arc<Mutex<OrdersQueue>>,
+    orders_cond: Arc<Condvar>,
     path: P
 ) -> Result<(), CoffeeMakerError> {
     let result = read_orders_from_file(path);
     match result {
-        Ok(json_orders) => add_orders_to_list(json_orders, order_list, order_semaphore),
+        Ok(json_orders) => add_orders_to_list(json_orders, order_list, orders_cond),
         Err(_) => Err(CoffeeMakerError::FileReaderError),
     }
 }

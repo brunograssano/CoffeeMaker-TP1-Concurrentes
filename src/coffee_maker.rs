@@ -13,10 +13,11 @@ use crate::{
     container_source_replenisher::ContainerReplenisher,
     external_source_replenisher::ExternalReplenisher,
     statistics::StatisticsPrinter,
+    orders_queue::OrdersQueue,
 };
 
 pub struct CoffeeMaker {
-    order_list: Arc<Mutex<VecDeque<Order>>>,
+    order_list: Arc<Mutex<OrdersQueue>>,
     orders_to_take: Arc<Condvar>,
     dispensers: Vec<Arc<Dispenser>>,
     container_replenishers: Vec<Arc<ContainerReplenisher>>,
@@ -40,7 +41,7 @@ impl CoffeeMaker {
         resources.insert(Ingredient::Cacao, Arc::new(Mutex::new((C_STORAGE, 0))));
 
         let resources = Arc::new(resources);
-        let order_list = Arc::new(Mutex::new(VecDeque::new()));
+        let order_list = Arc::new(Mutex::new(OrdersQueue::new()));
         let orders_to_take = Arc::new(Condvar::new());
         let replenisher_cond = Arc::new(Condvar::new());
         let ingredients_cond = Arc::new(Condvar::new());
@@ -147,10 +148,6 @@ impl CoffeeMaker {
 
         if let Err(err) = reader.join() {
             println!("[ERROR ON READER] {:?}", err);
-        }
-
-        for dispenser in &self.dispensers {
-            dispenser.finish();
         }
 
         for dispenser in dispenser_threads {

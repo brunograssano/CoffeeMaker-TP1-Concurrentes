@@ -7,13 +7,12 @@ use std::{
 
 use log::{ debug, info, error };
 
-use crate::{ order::{ Order, Ingredient }, errors::CoffeeMakerError };
+use crate::{ order::{ Order, Ingredient }, errors::CoffeeMakerError, orders_queue::OrdersQueue };
 
 pub struct Dispenser {
     id: usize,
-    orders_list: Arc<Mutex<VecDeque<Order>>>,
+    orders_list: Arc<Mutex<OrdersQueue>>,
     orders_to_take: Arc<Condvar>,
-    finish: Arc<Mutex<bool>>,
     replenisher: Arc<Condvar>,
     ingredients_available: Arc<Condvar>,
     resources: Arc<HashMap<Ingredient, Arc<Mutex<(u64, u64)>>>>,
@@ -23,7 +22,7 @@ pub struct Dispenser {
 impl Dispenser {
     pub fn new(
         id: usize,
-        orders_list: Arc<Mutex<VecDeque<Order>>>,
+        orders_list: Arc<Mutex<OrdersQueue>>,
         orders_to_take: Arc<Condvar>,
         replenisher: Arc<Condvar>,
         ingredients_available: Arc<Condvar>,
@@ -38,36 +37,22 @@ impl Dispenser {
             ingredients_available,
             resources,
             orders_processed,
-            finish: Arc::new(Mutex::new(false)),
         }
-    }
-
-    pub fn finish(&self) {
-        if let Ok(mut finish) = self.finish.lock() {
-            *finish = true;
-            self.orders_to_take.notify_all();
-            return;
-        }
-        error!("Error setting dispenser to finish when the queue is empty");
     }
 
     pub fn handle_orders(&self) -> Result<(), CoffeeMakerError> {
         loop {
             let order = {
                 let mut orders = self.orders_to_take.wait_while(self.orders_list.lock()?, |queue| {
-                    let mut finish = true;
-                    if let Ok(finish_result) = self.finish.lock() {
-                        finish = *finish_result;
-                    }
-                    queue.is_empty() && !finish
+                    queue.is_empty() && !queue.finished
                 })?;
 
-                if *self.finish.lock()? && orders.is_empty() {
-                    println!("Salgo {}", self.id);
+                if orders.is_empty() && orders.finished {
+                    println!("{}", self.id);
                     return Ok(());
                 }
 
-                orders.pop_front().ok_or(CoffeeMakerError::EmptyQueueWhenNotExpected)?
+                orders.pop().ok_or(CoffeeMakerError::EmptyQueueWhenNotExpected)?
             };
 
             debug!("[DISPENSER {}] Takes order {}", self.id, order.id);

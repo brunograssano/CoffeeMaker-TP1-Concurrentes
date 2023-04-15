@@ -7,6 +7,7 @@ pub mod constants;
 pub mod external_source_replenisher;
 pub mod container_source_replenisher;
 pub mod statistics;
+pub mod orders_queue;
 
 use coffee_maker::CoffeeMaker;
 
