@@ -112,55 +112,75 @@ impl CoffeeMaker {
     }
 
     pub fn manage_orders(&self) {
+        let reader = self.create_reader_thread();
+        let replenisher_threads = self.create_container_replenisher_threads();
+        let water_replenisher_thread = self.create_water_replenisher_thread();
+        let statistics_thread = self.create_statistics_thread();
+        let dispenser_threads = self.create_dispenser_threads();
+
+        wait_for_reader(reader);
+        wait_for_dispensers(dispenser_threads);
+        self.wait_for_replenishers(replenisher_threads, water_replenisher_thread);
+        self.wait_for_statistics_thread(statistics_thread);
+    }
+
+    fn create_reader_thread(&self) -> JoinHandle<Result<(), CoffeeMakerError>> {
         let orders_list_clone = self.order_list.clone();
         let orders_to_take_clone = self.orders_to_take.clone();
 
-        let reader = thread::spawn(move || {
+        thread::spawn(move || {
             read_and_add_orders(orders_list_clone, orders_to_take_clone, "orders.json")
-        });
+        })
+    }
 
-        let replenisher_threads: Vec<
-            JoinHandle<Result<(), CoffeeMakerError>>
-        > = self.container_replenishers
+    fn create_container_replenisher_threads(
+        &self
+    ) -> Vec<JoinHandle<Result<(), CoffeeMakerError>>> {
+        self.container_replenishers
             .iter()
             .map(|replenisher| {
                 let replenisher_clone = replenisher.clone();
                 thread::spawn(move || { replenisher_clone.replenish_container() })
             })
-            .collect();
+            .collect()
+    }
 
+    fn create_water_replenisher_thread(&self) -> JoinHandle<Result<(), CoffeeMakerError>> {
         let water_replenisher_clone = self.water_replenisher.clone();
-        let water_replenisher_thread = thread::spawn(move || {
-            water_replenisher_clone.replenish_container()
-        });
+        thread::spawn(move || { water_replenisher_clone.replenish_container() })
+    }
 
+    fn create_statistics_thread(&self) -> JoinHandle<Result<(), CoffeeMakerError>> {
         let statistics_printer_clone = self.statistics_printer.clone();
-        let statistics_thread = thread::spawn(move || {
-            statistics_printer_clone.print_statistics()
-        });
+        thread::spawn(move || { statistics_printer_clone.process_statistics() })
+    }
 
-        let dispenser_threads: Vec<JoinHandle<Result<(), CoffeeMakerError>>> = self.dispensers
+    fn create_dispenser_threads(&self) -> Vec<JoinHandle<Result<(), CoffeeMakerError>>> {
+        self.dispensers
             .iter()
             .map(|dispenser| {
                 let dispenser_clone = dispenser.clone();
                 thread::spawn(move || { dispenser_clone.handle_orders() })
             })
-            .collect();
+            .collect()
+    }
 
-        if let Err(err) = reader.join() {
-            println!("[ERROR ON READER] {:?}", err);
+    fn wait_for_statistics_thread(
+        &self,
+        statistics_thread: JoinHandle<Result<(), CoffeeMakerError>>
+    ) {
+        self.statistics_printer.finish();
+        if let Err(err) = statistics_thread.join() {
+            println!("[ERROR ON STATISTICS THREAD] {:?}", err);
         }
+    }
 
-        for dispenser in dispenser_threads {
-            if let Err(err) = dispenser.join() {
-                println!("[ERROR ON DISPENSER] {:?}", err);
-            }
-        }
-
-        for replenisher in &self.container_replenishers {
-            replenisher.finish();
-        }
-        self.water_replenisher.finish();
+    fn wait_for_replenishers(
+        &self,
+        replenisher_threads: Vec<JoinHandle<Result<(), CoffeeMakerError>>>,
+        water_replenisher_thread: JoinHandle<Result<(), CoffeeMakerError>>
+    ) {
+        self.signal_replenishers_to_finish();
 
         for replenisher in replenisher_threads {
             if let Err(err) = replenisher.join() {
@@ -171,9 +191,26 @@ impl CoffeeMaker {
         if let Err(err) = water_replenisher_thread.join() {
             println!("[ERROR ON REPLENISHER] {:?}", err);
         }
-        self.statistics_printer.finish();
-        if let Err(err) = statistics_thread.join() {
-            println!("[ERROR ON STATISTICS THREAD] {:?}", err);
+    }
+
+    fn signal_replenishers_to_finish(&self) {
+        for replenisher in &self.container_replenishers {
+            replenisher.finish();
+        }
+        self.water_replenisher.finish();
+    }
+}
+
+fn wait_for_reader(reader: JoinHandle<Result<(), CoffeeMakerError>>) {
+    if let Err(err) = reader.join() {
+        println!("[ERROR ON READER] {:?}", err);
+    }
+}
+
+fn wait_for_dispensers(dispenser_threads: Vec<JoinHandle<Result<(), CoffeeMakerError>>>) {
+    for dispenser in dispenser_threads {
+        if let Err(err) = dispenser.join() {
+            println!("[ERROR ON DISPENSER] {:?}", err);
         }
     }
 }

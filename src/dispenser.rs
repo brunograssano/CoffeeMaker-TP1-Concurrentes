@@ -1,9 +1,4 @@
-use std::{
-    sync::{ Arc, RwLock, Condvar, Mutex },
-    collections::{ VecDeque, HashMap },
-    time::Duration,
-    thread,
-};
+use std::{ sync::{ Arc, RwLock, Condvar, Mutex }, collections::HashMap, time::Duration, thread };
 
 use log::{ debug, info, error };
 
@@ -53,7 +48,6 @@ impl Dispenser {
                 })?;
 
                 if orders.is_empty() && orders.finished {
-                    println!("{}", self.id);
                     return Ok(());
                 }
 

@@ -14,7 +14,6 @@ pub struct ExternalReplenisher {
     container_lock: Arc<Mutex<Container>>,
     replenisher_cond: Arc<Condvar>,
     ingredients_cond: Arc<Condvar>,
-    finish: Arc<RwLock<bool>>,
     max_storage_of_container: u64,
 }
 
@@ -32,13 +31,12 @@ impl ExternalReplenisher {
             replenisher_cond,
             ingredients_cond,
             max_storage_of_container,
-            finish: Arc::new(RwLock::new(false)),
         }
     }
 
     pub fn finish(&self) {
-        if let Ok(mut finish) = self.finish.write() {
-            *finish = true;
+        if let Ok(mut container) = self.container_lock.lock() {
+            container.finished = true;
             self.replenisher_cond.notify_all();
             return;
         }
@@ -50,15 +48,11 @@ impl ExternalReplenisher {
             if let Ok(lock) = self.container_lock.lock() {
                 let mut mutex = self.replenisher_cond
                     .wait_while(lock, |container| {
-                        let mut finish = true;
-                        if let Ok(finish_result) = self.finish.read() {
-                            finish = *finish_result;
-                        }
-                        container.remaining > REPLENISH_LIMIT && !finish
+                        container.remaining > REPLENISH_LIMIT && !container.finished
                     })
                     .map_err(|_| { CoffeeMakerError::LockError })?;
 
-                if *self.finish.read()? {
+                if mutex.finished {
                     return Ok(());
                 }
                 self.replenish(&mut mutex);
