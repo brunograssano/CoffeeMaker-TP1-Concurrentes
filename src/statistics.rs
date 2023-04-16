@@ -8,7 +8,9 @@ use std::{
 use log::error;
 
 use crate::{
-    constants::STATISTICS_WAIT_IN_MS, container::Container, errors::CoffeeMakerError,
+    constants::{C_STORAGE, L_STORAGE, M_STORAGE, STATISTICS_WAIT_IN_MS, X_PERCENTAGE_OF_CAPACITY},
+    container::Container,
+    errors::CoffeeMakerError,
     order::Ingredient,
 };
 
@@ -74,6 +76,7 @@ impl StatisticsPrinter {
                 " {:?}=({},{}) ",
                 ingredient, container.remaining, container.consumed
             ));
+            print_warning_if_below_x_level(&ingredient, container.remaining);
         }
         Ok(())
     }
@@ -84,5 +87,23 @@ impl StatisticsPrinter {
             .read()
             .map_err(|_| CoffeeMakerError::LockError)?;
         Ok(processed)
+    }
+}
+
+fn print_warning_if_below_x_level(ingredient: &Ingredient, remaining: u64) {
+    match ingredient {
+        Ingredient::Cacao => handle_warning_level(ingredient, remaining, C_STORAGE),
+        Ingredient::ColdMilk => handle_warning_level(ingredient, remaining, L_STORAGE),
+        Ingredient::GrainsToGrind => handle_warning_level(ingredient, remaining, M_STORAGE),
+        _ => {}
+    }
+}
+
+fn handle_warning_level(ingredient: &Ingredient, remaining: u64, initial_level: u64) {
+    if remaining < (initial_level * X_PERCENTAGE_OF_CAPACITY) / 100 {
+        println!(
+            "[WARNING] {:?} container below {}% capacity",
+            ingredient, X_PERCENTAGE_OF_CAPACITY
+        )
     }
 }
