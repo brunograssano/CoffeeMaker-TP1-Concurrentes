@@ -29,8 +29,8 @@ struct OrdersConfiguration {
     orders: Vec<JsonOrder>,
 }
 
-fn read_orders_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<JsonOrder>, Box<dyn Error>> {
-    let file = File::open(path)?;
+fn read_orders_from_file(path: String) -> Result<Vec<JsonOrder>, Box<dyn Error>> {
+    let file = File::open(&Path::new(&path))?;
     let reader = BufReader::new(file);
     let orders_config: OrdersConfiguration = serde_json::from_reader(reader)?;
     Ok(orders_config.orders)
@@ -81,16 +81,27 @@ fn get_ingredients_from_order(order: JsonOrder) -> Vec<(Ingredient, u64)> {
     ingredients
 }
 
-pub fn read_and_add_orders<P: AsRef<Path>>(
+pub fn read_and_add_orders(
     order_list: Arc<Mutex<OrdersQueue>>,
     orders_cond: Arc<Condvar>,
-    path: P,
+    path: String,
 ) -> Result<(), CoffeeMakerError> {
     let result = read_orders_from_file(path);
     match result {
         Ok(json_orders) => add_orders_to_list(json_orders, order_list, orders_cond),
-        Err(_) => Err(CoffeeMakerError::FileReaderError),
+        Err(_) => handle_error_with_file(order_list, orders_cond),
     }
+}
+
+fn handle_error_with_file(
+    orders_queue_lock: Arc<Mutex<OrdersQueue>>,
+    orders_cond: Arc<Condvar>,
+) -> Result<(), CoffeeMakerError> {
+    if let Ok(mut queue) = orders_queue_lock.lock() {
+        queue.finished = true;
+        orders_cond.notify_all();
+    }
+    Err(CoffeeMakerError::FileReaderError)
 }
 
 #[cfg(test)]

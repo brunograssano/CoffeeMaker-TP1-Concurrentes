@@ -102,8 +102,8 @@ fn print_warning_if_below_x_level(ingredient: &Ingredient, remaining: u64) {
 fn handle_warning_level(ingredient: &Ingredient, remaining: u64, initial_level: u64) {
     if remaining < (initial_level * X_PERCENTAGE_OF_CAPACITY) / 100 {
         println!(
-            "[WARNING] {:?} container below {}% capacity",
-            ingredient, X_PERCENTAGE_OF_CAPACITY
+            "[WARNING] {:?} container below {}% capacity at {}",
+            ingredient, X_PERCENTAGE_OF_CAPACITY, remaining
         )
     }
 }

@@ -11,11 +11,30 @@ pub mod orders_reader;
 pub mod statistics;
 
 use coffee_maker::CoffeeMaker;
+use std::env;
 
 fn main() {
-    if let Err(err) = simple_logger::init_with_env() {
-        println!("Error setting logger: {:?}", err); // RUST_LOG=info to set
-    }
+    set_logger_config();
+    let path = get_orders_path();
     let coffee_maker = CoffeeMaker::new();
-    coffee_maker.manage_orders();
+    coffee_maker.manage_orders(path);
+}
+
+fn get_orders_path() -> String {
+    let args: Vec<String> = env::args().collect();
+    let mut path = "orders.json";
+    if args.len() == 2 {
+        path = &args[1];
+    }
+    String::from(path)
+}
+
+fn set_logger_config() {
+    if env::var("RUST_LOG").is_err() {
+        if let Err(err) = simple_logger::init_with_level(log::Level::Error) {
+            println!("Error setting logger to default value: {:?}", err);
+        }
+    } else if let Err(err) = simple_logger::init_with_env() {
+        println!("Error setting logger: {:?}", err);
+    }
 }

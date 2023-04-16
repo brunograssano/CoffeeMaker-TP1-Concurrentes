@@ -103,26 +103,22 @@ impl CoffeeMaker {
         }
     }
 
-    pub fn manage_orders(&self) {
-        let reader = self.create_reader_thread();
+    pub fn manage_orders(&self, path: String) {
+        let reader = self.create_reader_thread(path);
         let replenisher_threads = self.create_container_replenisher_threads();
         let water_replenisher_thread = self.create_water_replenisher_thread();
         let statistics_thread = self.create_statistics_thread();
         let dispenser_threads = self.create_dispenser_threads();
-
         wait_for_reader(reader);
         wait_for_dispensers(dispenser_threads);
         self.wait_for_replenishers(replenisher_threads, water_replenisher_thread);
         self.wait_for_statistics_thread(statistics_thread);
     }
 
-    fn create_reader_thread(&self) -> JoinHandle<Result<(), CoffeeMakerError>> {
+    fn create_reader_thread(&self, path: String) -> JoinHandle<Result<(), CoffeeMakerError>> {
         let orders_list_clone = self.order_list.clone();
         let orders_to_take_clone = self.orders_to_take.clone();
-
-        thread::spawn(move || {
-            read_and_add_orders(orders_list_clone, orders_to_take_clone, "orders.json")
-        })
+        thread::spawn(move || read_and_add_orders(orders_list_clone, orders_to_take_clone, path))
     }
 
     fn create_container_replenisher_threads(
