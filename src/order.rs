@@ -1,4 +1,7 @@
+/// Cantidad total de ingredientes unicos que maneja la cafetera. Debe de coincidir con la cantidad en el `enum Ingredient`
 pub const TOTAL_INGREDIENTS: usize = 6;
+
+/// Ingredientes que puede manejar la cafetera
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Ingredient {
     GroundCoffee,
@@ -9,6 +12,8 @@ pub enum Ingredient {
     ColdMilk,
 }
 
+/// Estructura para representar un pedido.
+/// Esta compuesta por un id y un vector con los ingredientes y cantidades a usar. El vector no sigue un orden en particular
 #[derive(Debug)]
 pub struct Order {
     pub id: usize,
@@ -16,6 +21,7 @@ pub struct Order {
 }
 
 impl Order {
+    /// Constructor de un pedido
     pub fn new(id: usize, ingredients: Vec<(Ingredient, u64)>) -> Order {
         Order { id, ingredients }
     }

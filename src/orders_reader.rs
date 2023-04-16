@@ -11,8 +11,10 @@ use rand::thread_rng;
 
 use crate::errors::CoffeeMakerError;
 use crate::order::{Ingredient, Order};
+
 use crate::orders_queue::OrdersQueue;
 
+/// Representacion de un pedido cuando viene en el archivo JSON. Tiene los ingredientes que se pueden usar y las cantidades de cada uno.
 #[derive(Deserialize, Debug)]
 struct JsonOrder {
     ground_coffee: u64,
@@ -21,6 +23,7 @@ struct JsonOrder {
     milk_foam: u64,
 }
 
+/// Representa la lista de pedidos en el archivo JSON
 #[derive(Deserialize)]
 struct OrdersConfiguration {
     orders: Vec<JsonOrder>,
@@ -87,5 +90,95 @@ pub fn read_and_add_orders<P: AsRef<Path>>(
     match result {
         Ok(json_orders) => add_orders_to_list(json_orders, order_list, orders_cond),
         Err(_) => Err(CoffeeMakerError::FileReaderError),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_get_the_ingredients_from_the_json_order() {
+        let ingredients = get_ingredients_from_order(JsonOrder {
+            ground_coffee: 10,
+            hot_water: 20,
+            cacao: 30,
+            milk_foam: 40,
+        });
+        assert_eq!(false, ingredients.is_empty());
+        assert_eq!(4, ingredients.len());
+        let mut quantities = [0; 4];
+        for (i, quantity) in ingredients {
+            match i {
+                Ingredient::Cacao => {
+                    quantities[0] = quantity;
+                }
+                Ingredient::HotWater => {
+                    quantities[1] = quantity;
+                }
+                Ingredient::GroundCoffee => {
+                    quantities[2] = quantity;
+                }
+                Ingredient::MilkFoam => {
+                    quantities[3] = quantity;
+                }
+                _ => panic!("Failed to get ingredients from json order"),
+            }
+        }
+        assert_eq!([30, 20, 10, 40], quantities);
+    }
+
+    #[test]
+    fn should_get_the_ingredients_from_the_json_order_when_there_are_some_missing() {
+        let ingredients = get_ingredients_from_order(JsonOrder {
+            ground_coffee: 10,
+            hot_water: 0,
+            cacao: 30,
+            milk_foam: 0,
+        });
+        assert_eq!(false, ingredients.is_empty());
+        assert_eq!(2, ingredients.len());
+        let mut quantities = [0; 2];
+        for (i, quantity) in ingredients {
+            match i {
+                Ingredient::Cacao => {
+                    quantities[0] = quantity;
+                }
+                Ingredient::GroundCoffee => {
+                    quantities[1] = quantity;
+                }
+                _ => panic!("Failed to get ingredients from json order"),
+            }
+        }
+        assert_eq!([30, 10], quantities);
+    }
+
+    #[test]
+    fn should_add_the_orders_to_the_queue() {
+        let mut json_orders = Vec::new();
+        json_orders.push(JsonOrder {
+            ground_coffee: 10,
+            hot_water: 0,
+            cacao: 30,
+            milk_foam: 0,
+        });
+        json_orders.push(JsonOrder {
+            ground_coffee: 100,
+            hot_water: 200,
+            cacao: 300,
+            milk_foam: 400,
+        });
+
+        let queue = OrdersQueue::new();
+        let mutex = Arc::new(Mutex::new(queue));
+        let cond = Arc::new(Condvar::new());
+        let result = add_orders_to_list(json_orders, mutex.clone(), cond);
+        assert!(result.is_ok());
+
+        let mut queue = mutex.lock().expect("Test error");
+        assert!(queue.finished);
+        assert!(queue.pop().is_some());
+        assert!(queue.pop().is_some());
+        assert!(queue.pop().is_none());
     }
 }
