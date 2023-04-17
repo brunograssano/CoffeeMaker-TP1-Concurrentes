@@ -7,7 +7,7 @@ use std::{
 use log::{error, info};
 
 use crate::{
-    constants::{MINIMUM_WAIT_TIME_REPLENISHER, REPLENISH_LIMIT},
+    constants::{MAX_OF_INGREDIENT_IN_AN_ORDER, MINIMUM_WAIT_TIME_REPLENISHER},
     container::Container,
     errors::CoffeeMakerError,
     order::Ingredient,
@@ -52,7 +52,7 @@ impl ExternalReplenisher {
             let mut container = self
                 .replenisher_cond
                 .wait_while(self.container_lock.lock()?, |container| {
-                    container.remaining > REPLENISH_LIMIT && !container.finished
+                    container.remaining > MAX_OF_INGREDIENT_IN_AN_ORDER && !container.finished
                 })
                 .map_err(|_| CoffeeMakerError::LockError)?;
 

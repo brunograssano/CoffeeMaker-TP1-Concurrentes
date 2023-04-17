@@ -192,4 +192,32 @@ mod tests {
         assert!(queue.pop().is_some());
         assert!(queue.pop().is_none());
     }
+
+    #[test]
+    fn should_return_file_error_if_the_file_does_not_exists() {
+        let result = read_and_add_orders(
+            Arc::new(Mutex::new(OrdersQueue::new())),
+            Arc::new(Condvar::new()),
+            String::from("not-a-file.json"),
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            CoffeeMakerError::FileReaderError,
+            result.err().expect("Fail test")
+        )
+    }
+
+    #[test]
+    fn should_return_file_error_if_the_files_format_is_wrong() {
+        let result = read_and_add_orders(
+            Arc::new(Mutex::new(OrdersQueue::new())),
+            Arc::new(Condvar::new()),
+            String::from("tests/wrong_format.json"),
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            CoffeeMakerError::FileReaderError,
+            result.err().expect("Fail test")
+        )
+    }
 }

@@ -1,0 +1,10 @@
+{
+    "orders": [
+        {
+            "ground_coffee": "40",
+            "hot_water": "100",
+            "cacao": 30,
+            "milk_foam": -10
+        }
+    ]
+}

@@ -202,3 +202,80 @@ fn wait_for_dispensers(dispenser_threads: Vec<JoinHandle<Result<(), CoffeeMakerE
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_finish_correctly_if_the_file_does_not_exists() {
+        let coffee_maker = CoffeeMaker::new();
+        coffee_maker.manage_orders(String::from("not-a-file.json"));
+        assert_eq!(
+            0,
+            *coffee_maker
+                .statistics_printer
+                .processed
+                .read()
+                .expect("Fail test")
+        );
+    }
+
+    #[test]
+    fn should_finish_correctly_if_there_are_no_orders_on_the_file() {
+        let coffee_maker = CoffeeMaker::new();
+        coffee_maker.manage_orders(String::from("tests/no_orders.json"));
+        assert_eq!(
+            0,
+            *coffee_maker
+                .statistics_printer
+                .processed
+                .read()
+                .expect("Fail test")
+        );
+    }
+
+    #[test]
+    fn should_process_an_order_and_finish() {
+        let coffee_maker = CoffeeMaker::new();
+        coffee_maker.manage_orders(String::from("tests/simple_order.json"));
+
+        let processed = *coffee_maker
+            .statistics_printer
+            .processed
+            .read()
+            .expect("Fail test");
+        assert_eq!(1, processed);
+
+        let resources = &coffee_maker.statistics_printer.resources;
+
+        let cacao = resources.get(&Ingredient::Cacao).expect("Fail test");
+        let milk_foam = resources.get(&Ingredient::MilkFoam).expect("Fail test");
+        let ground_coffee = resources.get(&Ingredient::GroundCoffee).expect("Fail test");
+        let water = resources.get(&Ingredient::HotWater).expect("Fail test");
+        let grains = resources
+            .get(&Ingredient::GrainsToGrind)
+            .expect("Fail test");
+        let cold_milk = resources.get(&Ingredient::ColdMilk).expect("Fail test");
+
+        let cacao = cacao.lock().expect("Fail test");
+        let milk_foam = milk_foam.lock().expect("Fail test");
+        let ground_coffee = ground_coffee.lock().expect("Fail test");
+        let water = water.lock().expect("Fail test");
+        let grains = grains.lock().expect("Fail test");
+        let cold_milk = cold_milk.lock().expect("Fail test");
+
+        assert_eq!(C_STORAGE - 60, cacao.remaining);
+        assert_eq!(60, cacao.consumed);
+        assert_eq!(E_STORAGE - 70, milk_foam.remaining);
+        assert_eq!(70, milk_foam.consumed);
+        assert_eq!(M_STORAGE - 100, ground_coffee.remaining);
+        assert_eq!(100, ground_coffee.consumed);
+        assert_eq!(A_STORAGE - 150, water.remaining);
+        assert_eq!(150, water.consumed);
+        assert_eq!(G_STORAGE, grains.remaining);
+        assert_eq!(0, grains.consumed);
+        assert_eq!(L_STORAGE, cold_milk.remaining);
+        assert_eq!(0, cold_milk.consumed);
+    }
+}

@@ -15,8 +15,8 @@ use crate::{
 };
 
 pub struct StatisticsPrinter {
-    processed: Arc<RwLock<u64>>,
-    resources: Arc<HashMap<Ingredient, Arc<Mutex<Container>>>>,
+    pub processed: Arc<RwLock<u64>>,
+    pub resources: Arc<HashMap<Ingredient, Arc<Mutex<Container>>>>,
     finish: Arc<Mutex<bool>>,
 }
 
