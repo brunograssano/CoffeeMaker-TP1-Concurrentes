@@ -1,0 +1,53 @@
+{
+    "orders": [
+        {
+            "ground_coffee": 0,
+            "hot_water": 0,
+            "cacao": 1000,
+            "milk_foam": 0
+        },
+        {
+            "ground_coffee": 0,
+            "hot_water": 0,
+            "cacao": 1000,
+            "milk_foam": 0
+        },
+        {
+            "ground_coffee": 0,
+            "hot_water": 0,
+            "cacao": 1000,
+            "milk_foam": 0
+        },
+        {
+            "ground_coffee": 0,
+            "hot_water": 0,
+            "cacao": 1000,
+            "milk_foam": 0
+        },
+        {
+            "ground_coffee": 0,
+            "hot_water": 0,
+            "cacao": 1000,
+            "milk_foam": 0
+        },
+        {
+            "ground_coffee": 0,
+            "hot_water": 0,
+            "cacao": 1000,
+            "milk_foam": 0
+        },        
+        {
+            "ground_coffee": 0,
+            "hot_water": 0,
+            "cacao": 1000,
+            "milk_foam": 0
+        },
+        {
+            "ground_coffee": 1000,
+            "hot_water": 1000,
+            "cacao": 0,
+            "milk_foam": 1000
+        } 
+
+    ]
+}

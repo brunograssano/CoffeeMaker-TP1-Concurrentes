@@ -333,4 +333,105 @@ mod tests {
         assert_eq!(L_STORAGE - 4000, cold_milk.remaining);
         assert_eq!(4000, cold_milk.consumed);
     }
+
+    /// Las cantidades de los ingredientes fueron calculadas con valores iniciales de 5000
+    #[test]
+    fn should_process_multiple_orders_and_finish() {
+        let coffee_maker = CoffeeMaker::new();
+        coffee_maker.manage_orders(String::from("tests/multiple_orders.json"));
+
+        let processed = *coffee_maker
+            .statistics_printer
+            .processed
+            .read()
+            .expect("Fail test");
+        assert_eq!(41, processed);
+
+        let resources = &coffee_maker.statistics_printer.resources;
+
+        let cacao = resources.get(&Ingredient::Cacao).expect("Fail test");
+        let milk_foam = resources.get(&Ingredient::MilkFoam).expect("Fail test");
+        let ground_coffee = resources.get(&Ingredient::GroundCoffee).expect("Fail test");
+        let water = resources.get(&Ingredient::HotWater).expect("Fail test");
+        let grains = resources
+            .get(&Ingredient::GrainsToGrind)
+            .expect("Fail test");
+        let cold_milk = resources.get(&Ingredient::ColdMilk).expect("Fail test");
+
+        let cacao = cacao.lock().expect("Fail test");
+        let milk_foam = milk_foam.lock().expect("Fail test");
+        let ground_coffee = ground_coffee.lock().expect("Fail test");
+        let water = water.lock().expect("Fail test");
+        let grains = grains.lock().expect("Fail test");
+        let cold_milk = cold_milk.lock().expect("Fail test");
+
+        assert_eq!(C_STORAGE - 410, cacao.remaining);
+        assert_eq!(410, cacao.consumed);
+
+        assert_eq!(E_STORAGE - 410, milk_foam.remaining);
+        assert_eq!(410, milk_foam.consumed);
+
+        assert_eq!(M_STORAGE - 410, ground_coffee.remaining);
+        assert_eq!(410, ground_coffee.consumed);
+
+        assert_eq!(A_STORAGE - 410, water.remaining);
+        assert_eq!(410, water.consumed);
+
+        assert_eq!(G_STORAGE, grains.remaining);
+        assert_eq!(0, grains.consumed);
+
+        assert_eq!(L_STORAGE, cold_milk.remaining);
+        assert_eq!(0, cold_milk.consumed);
+    }
+
+    /// Las cantidades de los ingredientes fueron calculadas con valores iniciales de 5000.
+    /// Hay 8 ordenes en el archivo, el cacao se acaba y se terminan salteando 2 ordenes
+    #[test]
+    fn should_skip_an_order_if_there_is_not_enough_of_an_ingredient() {
+        let coffee_maker = CoffeeMaker::new();
+        coffee_maker.manage_orders(String::from("tests/skip_orders.json"));
+
+        let processed = *coffee_maker
+            .statistics_printer
+            .processed
+            .read()
+            .expect("Fail test");
+        assert_eq!(6, processed);
+
+        let resources = &coffee_maker.statistics_printer.resources;
+
+        let cacao = resources.get(&Ingredient::Cacao).expect("Fail test");
+        let milk_foam = resources.get(&Ingredient::MilkFoam).expect("Fail test");
+        let ground_coffee = resources.get(&Ingredient::GroundCoffee).expect("Fail test");
+        let water = resources.get(&Ingredient::HotWater).expect("Fail test");
+        let grains = resources
+            .get(&Ingredient::GrainsToGrind)
+            .expect("Fail test");
+        let cold_milk = resources.get(&Ingredient::ColdMilk).expect("Fail test");
+
+        let cacao = cacao.lock().expect("Fail test");
+        let milk_foam = milk_foam.lock().expect("Fail test");
+        let ground_coffee = ground_coffee.lock().expect("Fail test");
+        let water = water.lock().expect("Fail test");
+        let grains = grains.lock().expect("Fail test");
+        let cold_milk = cold_milk.lock().expect("Fail test");
+
+        assert_eq!(0, cacao.remaining);
+        assert_eq!(C_STORAGE, cacao.consumed);
+
+        assert_eq!(E_STORAGE - 1000, milk_foam.remaining);
+        assert_eq!(1000, milk_foam.consumed);
+
+        assert_eq!(M_STORAGE - 1000, ground_coffee.remaining);
+        assert_eq!(1000, ground_coffee.consumed);
+
+        assert_eq!(A_STORAGE - 1000, water.remaining);
+        assert_eq!(1000, water.consumed);
+
+        assert_eq!(G_STORAGE, grains.remaining);
+        assert_eq!(0, grains.consumed);
+
+        assert_eq!(L_STORAGE, cold_milk.remaining);
+        assert_eq!(0, cold_milk.consumed);
+    }
 }
