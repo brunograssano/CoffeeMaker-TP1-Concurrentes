@@ -1,0 +1,22 @@
+{
+    "orders": [
+        {
+            "ground_coffee": 2000,
+            "hot_water": 2000,
+            "cacao": 600,
+            "milk_foam": 2000
+        },
+        {
+            "ground_coffee": 2000,
+            "hot_water": 2000,
+            "cacao": 600,
+            "milk_foam": 2000
+        },
+        {
+            "ground_coffee": 2000,
+            "hot_water": 2000,
+            "cacao": 600,
+            "milk_foam": 2000
+        } 
+    ]
+}

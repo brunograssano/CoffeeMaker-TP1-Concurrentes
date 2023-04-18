@@ -267,15 +267,70 @@ mod tests {
 
         assert_eq!(C_STORAGE - 60, cacao.remaining);
         assert_eq!(60, cacao.consumed);
+
         assert_eq!(E_STORAGE - 70, milk_foam.remaining);
         assert_eq!(70, milk_foam.consumed);
+
         assert_eq!(M_STORAGE - 100, ground_coffee.remaining);
         assert_eq!(100, ground_coffee.consumed);
+
         assert_eq!(A_STORAGE - 150, water.remaining);
         assert_eq!(150, water.consumed);
+
         assert_eq!(G_STORAGE, grains.remaining);
         assert_eq!(0, grains.consumed);
+
         assert_eq!(L_STORAGE, cold_milk.remaining);
         assert_eq!(0, cold_milk.consumed);
+    }
+
+    /// Las cantidades de los ingredientes fueron calculadas con valores iniciales de 5000
+    #[test]
+    fn should_process_three_big_orders_and_replenish_the_containers() {
+        let coffee_maker = CoffeeMaker::new();
+        coffee_maker.manage_orders(String::from("tests/replenish_containers.json"));
+
+        let processed = *coffee_maker
+            .statistics_printer
+            .processed
+            .read()
+            .expect("Fail test");
+        assert_eq!(3, processed);
+
+        let resources = &coffee_maker.statistics_printer.resources;
+
+        let cacao = resources.get(&Ingredient::Cacao).expect("Fail test");
+        let milk_foam = resources.get(&Ingredient::MilkFoam).expect("Fail test");
+        let ground_coffee = resources.get(&Ingredient::GroundCoffee).expect("Fail test");
+        let water = resources.get(&Ingredient::HotWater).expect("Fail test");
+        let grains = resources
+            .get(&Ingredient::GrainsToGrind)
+            .expect("Fail test");
+        let cold_milk = resources.get(&Ingredient::ColdMilk).expect("Fail test");
+
+        let cacao = cacao.lock().expect("Fail test");
+        let milk_foam = milk_foam.lock().expect("Fail test");
+        let ground_coffee = ground_coffee.lock().expect("Fail test");
+        let water = water.lock().expect("Fail test");
+        let grains = grains.lock().expect("Fail test");
+        let cold_milk = cold_milk.lock().expect("Fail test");
+
+        assert_eq!(C_STORAGE - 1800, cacao.remaining);
+        assert_eq!(1800, cacao.consumed);
+
+        assert_eq!(E_STORAGE - 2000, milk_foam.remaining);
+        assert_eq!(6000, milk_foam.consumed);
+
+        assert_eq!(M_STORAGE - 2000, ground_coffee.remaining);
+        assert_eq!(6000, ground_coffee.consumed);
+
+        assert_eq!(A_STORAGE - 2000, water.remaining);
+        assert_eq!(6000, water.consumed);
+
+        assert_eq!(G_STORAGE - 4000, grains.remaining);
+        assert_eq!(4000, grains.consumed);
+
+        assert_eq!(L_STORAGE - 4000, cold_milk.remaining);
+        assert_eq!(4000, cold_milk.consumed);
     }
 }
