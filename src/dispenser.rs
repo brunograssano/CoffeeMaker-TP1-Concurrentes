@@ -14,6 +14,9 @@ use crate::{
     orders_queue::OrdersQueue,
 };
 
+/// Representa a un dispenser de la cafetera.
+/// Tiene referencias a la cola de pedidos (junto con su variable condicional),
+/// reponedores de ingredientes (junto con su variable condicional), los recursos, y el contador de ordenes procesadas
 pub struct Dispenser {
     id: usize,
     orders_list: Arc<Mutex<OrdersQueue>>,

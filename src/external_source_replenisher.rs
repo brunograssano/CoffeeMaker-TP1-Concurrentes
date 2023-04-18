@@ -13,6 +13,7 @@ use crate::{
     order::Ingredient,
 };
 
+/// Representa a un reponedor de un contenedor a partir de una fuente externa. Esta fuente no se agota
 pub struct ExternalReplenisher {
     ingredient: Ingredient,
     container_lock: Arc<Mutex<Container>>,

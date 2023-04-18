@@ -101,6 +101,7 @@ fn handle_error_with_file(
         queue.finished = true;
         orders_cond.notify_all();
     }
+    error!("File reader error");
     Err(CoffeeMakerError::FileReaderError)
 }
 

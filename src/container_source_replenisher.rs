@@ -14,6 +14,7 @@ use crate::{
     order::Ingredient,
 };
 
+/// Representa a un reponedor de un contenedor a partir de otro contenedor. El contenedor usado como fuente puede agotarse
 pub struct ContainerReplenisher {
     source_ingredient: Ingredient,
     destination_ingredient: Ingredient,
