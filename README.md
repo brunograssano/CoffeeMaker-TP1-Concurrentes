@@ -57,22 +57,32 @@ Este archivo tiene que seguir el siguiente formato:
             "cacao": 60,
             "milk_foam": 70
         }
-        ...
+        // más ordenes...
     ]
 }
 ```
 
 Las ordenes pueden estar conformadas por cafe (`ground_coffee`), agua caliente (`hot_water`), cacao (`cacao`) y espuma de leche (`milk_foam`). Cada una de estas cantidades tiene que ser un entero positivo o cero.
 
-En caso de no respetarse el formato (por ejemplo, numeros negativos o tipos erroneos) se imprimira por pantalla el error y finalizara la ejecucion.
+En caso de no respetarse el formato (por ejemplo, numeros negativos o tipos erroneos) se imprimira por pantalla un mensaje de error y finalizara la ejecucion.
 
 ### Threads y comunicación
 
-El modelo de la aplicacion se puede representar a traves del siguiente diagrama:
+El modelo de la aplicacion se puede representar a traves de los siguientes diagramas.
 
 ![Relaciones entre las estructuras de la aplicación](docs/relationships.jpg)
 
+En este diagrama podemos ver la estructura en forma de objetos, como son las relaciones entre las distintas entidades. 
+
+Tenemos entonces
+* Order...
+* OrderReader no esta implementado con un struct, es una funcion que cumple el rol de leer el archivo y cargar las ordenes a la cola de pedidos.
+* Resources viene a agrupar a los distintos recursos que tiene la cafetera. Esta implementado con un mapa donde la clave es el nombre del recurso, un ingrediente, y el valor el contenedor. Se opto por esta estructura de datos para reducir la cantidad de `ifs` que habria al ir procesando las ordenes.
+
+
 ![Threads de la aplicación](docs/threads.jpg)
+
+TODO
 
 ### Documentación
 La documentacion de la aplicacion se puede ver con:
