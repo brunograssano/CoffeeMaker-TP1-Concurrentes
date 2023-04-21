@@ -66,13 +66,11 @@ Las ordenes pueden estar conformadas por cafe (`ground_coffee`), agua caliente (
 
 En caso de no respetarse el formato (por ejemplo, numeros negativos o tipos erroneos) se imprimira por pantalla un mensaje de error y finalizara la ejecucion.
 
-### Threads y comunicación
+### Modelo
 
 El modelo de la aplicacion se puede representar a traves de los siguientes diagramas.
 
 ![Relaciones entre las estructuras de la aplicación](docs/relationships.jpg)
-
-TODO tildes
 
 En este diagrama podemos ver la estructura en forma de objetos, como son las relaciones entre las distintas entidades. Tenemos las siguientes:
 * `Order` representa a un pedido de la cafetera. Esta compuesto por los ingredientes y cantidades que necesita. 
@@ -93,14 +91,30 @@ En este diagrama podemos ver la estructura en forma de objetos, como son las rel
     * El tiempo de espera que se tiene es `MINIMUM_WAIT_TIME_REPLENISHER` mas la cantidad que se esta reponiendo de recurso.
 * `CoffeeMaker` inicia la cafetera, indica a los threads que deben de terminar, y los espera. Es el punto de entrada al sistema.  
 
+### Threads y comunicación
+
+En el siguiente diagrama se busca representar la forma de comunicacion y threads que maneja la aplicacion.
 
 ![Threads de la aplicación](docs/threads.jpg)
+A partir del diagrama podemos notar:
+* Se utilizaron locks para proteger los diferentes recursos compartidos.
+* Hay 3 variables condicionales que se utilizan para que los hilos esperen y puedan despertartarse cuando es necesario.
+    * En un primer momento se utilizo un semaforo en remplazo a la variable condicional Orders. Este semaforo buscaba coordinar el acceso a la cola. Se termino cambiando debido a surgieron complicaciones al momento de querer finalizar el programa de forma ordenada.
+* No se incluyo en el diagrama la comunicacion con el hilo principal (main) para dar mas claridad al diagrama. El hilo principal lo que hace es iniciar y esperar a que terminen los hilos.
+    * En el caso de los hilos de estadisticas y reponedores, el hilo principal antes de esperarlos (join) realiza un cambio en sus estados para indicar que ya pueden finalizar. En los reponedores este cambio es notificado a traves de su variable condicional, ya que pueden estar durmiendo cuando es realizado el cambio.
+* La aplicacion inicializa un total de N + 4 hilos adicionales durante toda su ejecucion. Se armo un diseño donde la cantidad de hilos sea conocida para reducir el tiempo y costo de estar creando threads.
+    * N dispensadores, estos trabajan solamente si tienen pedidos.
+    * 3 hilos para reponedores (agua, leche, cafe), trabajan a pedido de un dispenser si se cumple su condicion.
+    * Hilo de estadisticas, imprime periodicamente por pantalla.
 
-TODO
+## Dificultades encontradas
+Durante el transcurso del trabajo practico se presentaron las siguientes dificultades:
+* Surgieron problemas al momento de querer finalizar de forma prolija la aplicacion. Esto se debia a que terminaba quedando algun hilo sin enterarse de que podia finalizar. El problema estaba sucediendo debido a como se estaba notificando y manejando el estado final (el flag estaba separado). Para su solucion se recurrio a crear nuevas estructuras que agrupen estados usados por las variables condicionales, por ejemplo `OrdersQueue` y `Container`.
+* Se tuvo una complicacion al querer crear una interfaz comun de los reponedores mediante Traits debido a que el compilador advertia que podia surgir un problema al momento de querer compartir entre hilos variables de las cuales se tiene que solo implementan el Trait. Esta complicacion probablemente se debe a falta de experiencia con el lenguaje.
+* Se nota la complejidad de realizar pruebas unitarias en ambientes concurrentes.
 
-### Dificultades encontradas
 
-### Documentación
+## Documentación
 La documentacion de la aplicacion se puede ver con:
 ```
 $ cargo doc --open
