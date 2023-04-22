@@ -32,7 +32,7 @@ struct OrdersConfiguration {
 }
 
 fn read_orders_from_file(path: String) -> Result<Vec<JsonOrder>, Box<dyn Error>> {
-    let file = File::open(&Path::new(&path))?;
+    let file = File::open(Path::new(&path))?;
     let reader = BufReader::new(file);
     let orders_config: OrdersConfiguration = serde_json::from_reader(reader)?;
     Ok(orders_config.orders)

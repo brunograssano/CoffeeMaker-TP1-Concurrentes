@@ -30,6 +30,12 @@ impl OrdersQueue {
     }
 }
 
+impl Default for OrdersQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

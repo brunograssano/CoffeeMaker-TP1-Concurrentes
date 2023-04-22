@@ -81,7 +81,7 @@ impl StatisticsPrinter {
                 " {:?}=({},{}) ",
                 ingredient, container.remaining, container.consumed
             ));
-            print_warning_if_below_x_level(&ingredient, container.remaining);
+            print_warning_if_below_x_level(ingredient, container.remaining);
         }
         Ok(())
     }
