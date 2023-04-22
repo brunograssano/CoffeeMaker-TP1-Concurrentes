@@ -74,7 +74,7 @@ El modelo de la aplicación se puede representar a través del siguiente diagram
 
 ![Relaciones entre las estructuras de la aplicación](docs/relationships.jpg)
 
-Se puede como es la estructura en forma de objetos y como son las relaciones. Tenemos las siguientes características:
+Se puede ver como es la estructura en forma de objetos y como son las relaciones. Tenemos las siguientes características:
 * `CoffeeMaker` inicia la cafetera, indica a los threads que deben de terminar, y los espera. Es el punto de entrada al sistema. 
 * `Order` representa a un pedido de la cafetera. Está compuesto por los ingredientes y cantidades que necesita. 
     * Se tomó el supuesto de que un pedido no puede necesitar más recurso que lo definido en `MAX_OF_INGREDIENT_IN_AN_ORDER`. Al no alcanzar el recurso almacenado para cubrir una orden con el máximo establecido se recargará el contenedor si corresponde. Se toma este supuesto para simplificar el proceso de despertar los reponedores de recursos en vez de estar llevando a cero el recurso del contenedor y luego reponer.
