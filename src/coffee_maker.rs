@@ -445,4 +445,49 @@ mod tests {
         assert_eq!(L_MILK_STORAGE, cold_milk.remaining);
         assert_eq!(0, cold_milk.consumed);
     }
+
+    /// Las cantidades de los ingredientes fueron calculadas con valores iniciales de 5000.
+    #[test]
+    fn should_consume_all_ingredients() {
+        let coffee_maker = CoffeeMaker::new();
+        coffee_maker.manage_orders(String::from("tests/consume_all.json"));
+
+        let processed = *coffee_maker
+            .statistics_printer
+            .processed
+            .read()
+            .expect("Fail test");
+        assert_eq!(500, processed);
+
+        let resources = &coffee_maker.statistics_printer.resources;
+
+        let cacao = resources.get(&Ingredient::Cacao).expect("Fail test");
+        let milk_foam = resources.get(&Ingredient::MilkFoam).expect("Fail test");
+        let ground_coffee = resources.get(&Ingredient::GroundCoffee).expect("Fail test");
+        let grains = resources
+            .get(&Ingredient::GrainsToGrind)
+            .expect("Fail test");
+        let cold_milk = resources.get(&Ingredient::ColdMilk).expect("Fail test");
+
+        let cacao = cacao.lock().expect("Fail test");
+        let milk_foam = milk_foam.lock().expect("Fail test");
+        let ground_coffee = ground_coffee.lock().expect("Fail test");
+        let grains = grains.lock().expect("Fail test");
+        let cold_milk = cold_milk.lock().expect("Fail test");
+
+        assert_eq!(0, cacao.remaining);
+        assert_eq!(C_CACAO_STORAGE, cacao.consumed);
+
+        assert_eq!(0, milk_foam.remaining);
+        assert_eq!(E_FOAM_STORAGE + L_MILK_STORAGE, milk_foam.consumed);
+
+        assert_eq!(0, ground_coffee.remaining);
+        assert_eq!(M_COFFEE_STORAGE + G_GRAINS_STORAGE, ground_coffee.consumed);
+
+        assert_eq!(0, grains.remaining);
+        assert_eq!(G_GRAINS_STORAGE, grains.consumed);
+
+        assert_eq!(0, cold_milk.remaining);
+        assert_eq!(L_MILK_STORAGE, cold_milk.consumed);
+    }
 }
