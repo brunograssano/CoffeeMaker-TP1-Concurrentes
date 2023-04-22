@@ -1,3 +1,5 @@
+//! Representacion de un pedido
+
 /// Cantidad total de ingredientes unicos que maneja la cafetera. Debe de coincidir con la cantidad en el `enum Ingredient`
 pub const TOTAL_INGREDIENTS: usize = 6;
 

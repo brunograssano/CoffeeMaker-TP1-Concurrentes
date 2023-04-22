@@ -1,3 +1,4 @@
+//! Dispenser de la cafetera. Procesa los pedidos.
 use std::{
     collections::HashMap,
     sync::{Arc, Condvar, Mutex, MutexGuard, RwLock},

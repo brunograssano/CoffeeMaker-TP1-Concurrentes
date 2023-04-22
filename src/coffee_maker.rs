@@ -1,3 +1,5 @@
+//! Punto de entrada a la aplicacion. Maneja la cafetera.
+
 use std::{
     collections::HashMap,
     sync::{Arc, Condvar, Mutex, RwLock},

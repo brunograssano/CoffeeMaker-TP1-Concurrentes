@@ -1,3 +1,4 @@
+//! Reponedor de un contenedor a partir de otro contenedor
 use std::{
     cmp::min,
     sync::{Arc, Condvar, Mutex},

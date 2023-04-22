@@ -1,3 +1,4 @@
+//! Representacion de la cola de pedidos
 use std::collections::VecDeque;
 
 use crate::order::Order;

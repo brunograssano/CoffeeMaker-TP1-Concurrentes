@@ -1,3 +1,4 @@
+//! Reponedor de la cafetera a partir de una fuente externa. Por ejemplo el agua.
 use std::{
     sync::{Arc, Condvar, Mutex},
     thread,

@@ -1,3 +1,4 @@
+//! Impresion de las estadisticas de la cafetera
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex, RwLock},

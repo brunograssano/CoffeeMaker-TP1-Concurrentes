@@ -1,3 +1,4 @@
+//! Lector de los pedidos a partir de un archivo
 use log::{debug, error, info};
 use serde::Deserialize;
 use std::error::Error;

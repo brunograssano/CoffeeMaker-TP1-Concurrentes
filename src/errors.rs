@@ -1,4 +1,4 @@
-/// Codigos de errores de la cafetera
+//! Codigos de error de la cafetera
 #[derive(Debug, PartialEq, Eq)]
 pub enum CoffeeMakerError {
     /// Indica que no se encontro un ingrediente requerido en el mapa de recursos
