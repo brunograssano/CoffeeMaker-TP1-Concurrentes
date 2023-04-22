@@ -5,7 +5,10 @@ use std::{
 };
 
 use crate::{
-    constants::{A_STORAGE, C_STORAGE, E_STORAGE, G_STORAGE, L_STORAGE, M_STORAGE, N_DISPENSERS},
+    constants::{
+        A_WATER_STORAGE, C_CACAO_STORAGE, E_FOAM_STORAGE, G_GRAINS_STORAGE, L_MILK_STORAGE,
+        M_COFFEE_STORAGE, N_DISPENSERS,
+    },
     container::Container,
     container_source_replenisher::ContainerReplenisher,
     dispenser::Dispenser,
@@ -18,8 +21,8 @@ use crate::{
 };
 
 pub struct CoffeeMaker {
-    order_list: Arc<Mutex<OrdersQueue>>,
-    orders_to_take: Arc<Condvar>,
+    orders_queue: Arc<Mutex<OrdersQueue>>,
+    orders_cond: Arc<Condvar>,
     dispensers: Vec<Arc<Dispenser>>,
     container_replenishers: Vec<Arc<ContainerReplenisher>>,
     water_replenisher: Arc<ExternalReplenisher>,
@@ -28,12 +31,13 @@ pub struct CoffeeMaker {
 
 impl CoffeeMaker {
     pub fn new() -> CoffeeMaker {
+        // Initialize containers and resources hash map
         let mut resources = HashMap::with_capacity(TOTAL_INGREDIENTS);
-        let cold_milk = Arc::new(Mutex::new(Container::new(L_STORAGE)));
-        let milk_foam = Arc::new(Mutex::new(Container::new(E_STORAGE)));
-        let hot_water = Arc::new(Mutex::new(Container::new(A_STORAGE)));
-        let grains_to_grind = Arc::new(Mutex::new(Container::new(G_STORAGE)));
-        let ground_coffee = Arc::new(Mutex::new(Container::new(M_STORAGE)));
+        let cold_milk = Arc::new(Mutex::new(Container::new(L_MILK_STORAGE)));
+        let milk_foam = Arc::new(Mutex::new(Container::new(E_FOAM_STORAGE)));
+        let hot_water = Arc::new(Mutex::new(Container::new(A_WATER_STORAGE)));
+        let grains_to_grind = Arc::new(Mutex::new(Container::new(G_GRAINS_STORAGE)));
+        let ground_coffee = Arc::new(Mutex::new(Container::new(M_COFFEE_STORAGE)));
         resources.insert(Ingredient::ColdMilk, cold_milk.clone());
         resources.insert(Ingredient::MilkFoam, milk_foam.clone());
         resources.insert(Ingredient::HotWater, hot_water.clone());
@@ -41,22 +45,24 @@ impl CoffeeMaker {
         resources.insert(Ingredient::GroundCoffee, ground_coffee.clone());
         resources.insert(
             Ingredient::Cacao,
-            Arc::new(Mutex::new(Container::new(C_STORAGE))),
+            Arc::new(Mutex::new(Container::new(C_CACAO_STORAGE))),
         );
 
+        // Initialize dispenser shared data
         let resources = Arc::new(resources);
-        let order_list = Arc::new(Mutex::new(OrdersQueue::new()));
-        let orders_to_take = Arc::new(Condvar::new());
+        let orders_queue = Arc::new(Mutex::new(OrdersQueue::new()));
+        let orders_cond = Arc::new(Condvar::new());
         let replenisher_cond = Arc::new(Condvar::new());
         let ingredients_cond = Arc::new(Condvar::new());
-
         let orders_processed = Arc::new(RwLock::new(0));
+
+        // Initialize dispensers
         let dispensers = (0..N_DISPENSERS)
             .map(|id| {
                 Arc::new(Dispenser::new(
                     id,
-                    order_list.clone(),
-                    orders_to_take.clone(),
+                    orders_queue.clone(),
+                    orders_cond.clone(),
                     replenisher_cond.clone(),
                     ingredients_cond.clone(),
                     resources.clone(),
@@ -65,14 +71,14 @@ impl CoffeeMaker {
             })
             .collect::<Vec<Arc<Dispenser>>>();
 
+        // Initialize containers
         let mut container_replenishers = Vec::new();
-
         container_replenishers.push(Arc::new(ContainerReplenisher::new(
             (Ingredient::GrainsToGrind, grains_to_grind.clone()),
             (Ingredient::GroundCoffee, ground_coffee.clone()),
             replenisher_cond.clone(),
             ingredients_cond.clone(),
-            M_STORAGE,
+            M_COFFEE_STORAGE,
         )));
 
         container_replenishers.push(Arc::new(ContainerReplenisher::new(
@@ -80,19 +86,19 @@ impl CoffeeMaker {
             (Ingredient::MilkFoam, milk_foam.clone()),
             replenisher_cond.clone(),
             ingredients_cond.clone(),
-            E_STORAGE,
+            E_FOAM_STORAGE,
         )));
 
         let water_replenisher = Arc::new(ExternalReplenisher::new(
             (Ingredient::HotWater, hot_water.clone()),
             replenisher_cond.clone(),
             ingredients_cond.clone(),
-            A_STORAGE,
+            A_WATER_STORAGE,
         ));
 
         CoffeeMaker {
-            order_list,
-            orders_to_take,
+            orders_queue,
+            orders_cond,
             dispensers,
             container_replenishers,
             water_replenisher,
@@ -116,9 +122,9 @@ impl CoffeeMaker {
     }
 
     fn create_reader_thread(&self, path: String) -> JoinHandle<Result<(), CoffeeMakerError>> {
-        let orders_list_clone = self.order_list.clone();
-        let orders_to_take_clone = self.orders_to_take.clone();
-        thread::spawn(move || read_and_add_orders(orders_list_clone, orders_to_take_clone, path))
+        let orders_queue_clone = self.orders_queue.clone();
+        let orders_cond_clone = self.orders_cond.clone();
+        thread::spawn(move || read_and_add_orders(orders_queue_clone, orders_cond_clone, path))
     }
 
     fn create_container_replenisher_threads(
@@ -265,22 +271,22 @@ mod tests {
         let grains = grains.lock().expect("Fail test");
         let cold_milk = cold_milk.lock().expect("Fail test");
 
-        assert_eq!(C_STORAGE - 60, cacao.remaining);
+        assert_eq!(C_CACAO_STORAGE - 60, cacao.remaining);
         assert_eq!(60, cacao.consumed);
 
-        assert_eq!(E_STORAGE - 70, milk_foam.remaining);
+        assert_eq!(E_FOAM_STORAGE - 70, milk_foam.remaining);
         assert_eq!(70, milk_foam.consumed);
 
-        assert_eq!(M_STORAGE - 100, ground_coffee.remaining);
+        assert_eq!(M_COFFEE_STORAGE - 100, ground_coffee.remaining);
         assert_eq!(100, ground_coffee.consumed);
 
-        assert_eq!(A_STORAGE - 150, water.remaining);
+        assert_eq!(A_WATER_STORAGE - 150, water.remaining);
         assert_eq!(150, water.consumed);
 
-        assert_eq!(G_STORAGE, grains.remaining);
+        assert_eq!(G_GRAINS_STORAGE, grains.remaining);
         assert_eq!(0, grains.consumed);
 
-        assert_eq!(L_STORAGE, cold_milk.remaining);
+        assert_eq!(L_MILK_STORAGE, cold_milk.remaining);
         assert_eq!(0, cold_milk.consumed);
     }
 
@@ -315,22 +321,22 @@ mod tests {
         let grains = grains.lock().expect("Fail test");
         let cold_milk = cold_milk.lock().expect("Fail test");
 
-        assert_eq!(C_STORAGE - 1800, cacao.remaining);
+        assert_eq!(C_CACAO_STORAGE - 1800, cacao.remaining);
         assert_eq!(1800, cacao.consumed);
 
-        assert_eq!(E_STORAGE - 2000, milk_foam.remaining);
+        assert_eq!(E_FOAM_STORAGE - 2000, milk_foam.remaining);
         assert_eq!(6000, milk_foam.consumed);
 
-        assert_eq!(M_STORAGE - 2000, ground_coffee.remaining);
+        assert_eq!(M_COFFEE_STORAGE - 2000, ground_coffee.remaining);
         assert_eq!(6000, ground_coffee.consumed);
 
-        assert_eq!(A_STORAGE - 2000, water.remaining);
+        assert_eq!(A_WATER_STORAGE - 2000, water.remaining);
         assert_eq!(6000, water.consumed);
 
-        assert_eq!(G_STORAGE - 4000, grains.remaining);
+        assert_eq!(G_GRAINS_STORAGE - 4000, grains.remaining);
         assert_eq!(4000, grains.consumed);
 
-        assert_eq!(L_STORAGE - 4000, cold_milk.remaining);
+        assert_eq!(L_MILK_STORAGE - 4000, cold_milk.remaining);
         assert_eq!(4000, cold_milk.consumed);
     }
 
@@ -365,22 +371,22 @@ mod tests {
         let grains = grains.lock().expect("Fail test");
         let cold_milk = cold_milk.lock().expect("Fail test");
 
-        assert_eq!(C_STORAGE - 410, cacao.remaining);
+        assert_eq!(C_CACAO_STORAGE - 410, cacao.remaining);
         assert_eq!(410, cacao.consumed);
 
-        assert_eq!(E_STORAGE - 410, milk_foam.remaining);
+        assert_eq!(E_FOAM_STORAGE - 410, milk_foam.remaining);
         assert_eq!(410, milk_foam.consumed);
 
-        assert_eq!(M_STORAGE - 410, ground_coffee.remaining);
+        assert_eq!(M_COFFEE_STORAGE - 410, ground_coffee.remaining);
         assert_eq!(410, ground_coffee.consumed);
 
-        assert_eq!(A_STORAGE - 410, water.remaining);
+        assert_eq!(A_WATER_STORAGE - 410, water.remaining);
         assert_eq!(410, water.consumed);
 
-        assert_eq!(G_STORAGE, grains.remaining);
+        assert_eq!(G_GRAINS_STORAGE, grains.remaining);
         assert_eq!(0, grains.consumed);
 
-        assert_eq!(L_STORAGE, cold_milk.remaining);
+        assert_eq!(L_MILK_STORAGE, cold_milk.remaining);
         assert_eq!(0, cold_milk.consumed);
     }
 
@@ -417,21 +423,21 @@ mod tests {
         let cold_milk = cold_milk.lock().expect("Fail test");
 
         assert_eq!(0, cacao.remaining);
-        assert_eq!(C_STORAGE, cacao.consumed);
+        assert_eq!(C_CACAO_STORAGE, cacao.consumed);
 
-        assert_eq!(E_STORAGE - 1000, milk_foam.remaining);
+        assert_eq!(E_FOAM_STORAGE - 1000, milk_foam.remaining);
         assert_eq!(1000, milk_foam.consumed);
 
-        assert_eq!(M_STORAGE - 1000, ground_coffee.remaining);
+        assert_eq!(M_COFFEE_STORAGE - 1000, ground_coffee.remaining);
         assert_eq!(1000, ground_coffee.consumed);
 
-        assert_eq!(A_STORAGE - 1000, water.remaining);
+        assert_eq!(A_WATER_STORAGE - 1000, water.remaining);
         assert_eq!(1000, water.consumed);
 
-        assert_eq!(G_STORAGE, grains.remaining);
+        assert_eq!(G_GRAINS_STORAGE, grains.remaining);
         assert_eq!(0, grains.consumed);
 
-        assert_eq!(L_STORAGE, cold_milk.remaining);
+        assert_eq!(L_MILK_STORAGE, cold_milk.remaining);
         assert_eq!(0, cold_milk.consumed);
     }
 }

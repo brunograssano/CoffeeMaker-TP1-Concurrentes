@@ -9,7 +9,6 @@ pub struct OrdersQueue {
 }
 
 impl OrdersQueue {
-    /// Constructor de la cola de pedidos.
     pub fn new() -> OrdersQueue {
         OrdersQueue {
             orders: VecDeque::new(),
@@ -17,17 +16,14 @@ impl OrdersQueue {
         }
     }
 
-    /// Agrega un pedido a la cola.
     pub fn push(&mut self, order: Order) {
         self.orders.push_back(order);
     }
 
-    /// Saca y devuelve un pedido de la cola.
     pub fn pop(&mut self) -> Option<Order> {
         self.orders.pop_front()
     }
 
-    /// Revisa si la cola esta vacia.
     pub fn is_empty(&self) -> bool {
         self.orders.is_empty()
     }

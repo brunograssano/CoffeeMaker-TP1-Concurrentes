@@ -9,6 +9,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
+use crate::constants::MAX_OF_INGREDIENT_IN_AN_ORDER;
 use crate::errors::CoffeeMakerError;
 use crate::order::{Ingredient, Order};
 
@@ -23,7 +24,7 @@ struct JsonOrder {
     milk_foam: u64,
 }
 
-/// Representa la lista de pedidos en el archivo JSON
+/// Representa la lista de pedidos en el archivo JSON. Con esta estructura el crate serde realiza el parseo.
 #[derive(Deserialize)]
 struct OrdersConfiguration {
     orders: Vec<JsonOrder>,
@@ -36,14 +37,14 @@ fn read_orders_from_file(path: String) -> Result<Vec<JsonOrder>, Box<dyn Error>>
     Ok(orders_config.orders)
 }
 
-fn add_orders_to_list(
+fn add_orders_to_queue(
     json_orders: Vec<JsonOrder>,
     orders_queue_lock: Arc<Mutex<OrdersQueue>>,
     orders_cond: Arc<Condvar>,
 ) -> Result<(), CoffeeMakerError> {
     let mut id = 0;
     for order in json_orders {
-        let ingredients = get_ingredients_from_order(order);
+        let ingredients = get_ingredients_from_json_order(order);
         if let Ok(mut queue) = orders_queue_lock.lock() {
             queue.push(Order::new(id, ingredients));
             debug!("[READER] Added order {}", id);
@@ -63,18 +64,18 @@ fn add_orders_to_list(
     Err(CoffeeMakerError::LockError)
 }
 
-fn get_ingredients_from_order(order: JsonOrder) -> Vec<(Ingredient, u64)> {
+fn get_ingredients_from_json_order(order: JsonOrder) -> Vec<(Ingredient, u64)> {
     let mut ingredients = Vec::new();
-    if 0 < order.ground_coffee {
+    if 0 < order.ground_coffee && order.ground_coffee <= MAX_OF_INGREDIENT_IN_AN_ORDER {
         ingredients.push((Ingredient::GroundCoffee, order.ground_coffee));
     }
-    if 0 < order.cacao {
+    if 0 < order.cacao && order.cacao <= MAX_OF_INGREDIENT_IN_AN_ORDER {
         ingredients.push((Ingredient::Cacao, order.cacao));
     }
-    if 0 < order.hot_water {
+    if 0 < order.hot_water && order.hot_water <= MAX_OF_INGREDIENT_IN_AN_ORDER {
         ingredients.push((Ingredient::HotWater, order.hot_water));
     }
-    if 0 < order.milk_foam {
+    if 0 < order.milk_foam && order.milk_foam <= MAX_OF_INGREDIENT_IN_AN_ORDER {
         ingredients.push((Ingredient::MilkFoam, order.milk_foam));
     }
     ingredients.shuffle(&mut thread_rng());
@@ -82,14 +83,14 @@ fn get_ingredients_from_order(order: JsonOrder) -> Vec<(Ingredient, u64)> {
 }
 
 pub fn read_and_add_orders(
-    order_list: Arc<Mutex<OrdersQueue>>,
+    orders_queue: Arc<Mutex<OrdersQueue>>,
     orders_cond: Arc<Condvar>,
     path: String,
 ) -> Result<(), CoffeeMakerError> {
     let result = read_orders_from_file(path);
     match result {
-        Ok(json_orders) => add_orders_to_list(json_orders, order_list, orders_cond),
-        Err(_) => handle_error_with_file(order_list, orders_cond),
+        Ok(json_orders) => add_orders_to_queue(json_orders, orders_queue, orders_cond),
+        Err(_) => handle_error_with_file(orders_queue, orders_cond),
     }
 }
 
@@ -111,7 +112,7 @@ mod tests {
 
     #[test]
     fn should_get_the_ingredients_from_the_json_order() {
-        let ingredients = get_ingredients_from_order(JsonOrder {
+        let ingredients = get_ingredients_from_json_order(JsonOrder {
             ground_coffee: 10,
             hot_water: 20,
             cacao: 30,
@@ -142,7 +143,7 @@ mod tests {
 
     #[test]
     fn should_get_the_ingredients_from_the_json_order_when_there_are_some_missing() {
-        let ingredients = get_ingredients_from_order(JsonOrder {
+        let ingredients = get_ingredients_from_json_order(JsonOrder {
             ground_coffee: 10,
             hot_water: 0,
             cacao: 30,
@@ -184,7 +185,7 @@ mod tests {
         let queue = OrdersQueue::new();
         let mutex = Arc::new(Mutex::new(queue));
         let cond = Arc::new(Condvar::new());
-        let result = add_orders_to_list(json_orders, mutex.clone(), cond);
+        let result = add_orders_to_queue(json_orders, mutex.clone(), cond);
         assert!(result.is_ok());
 
         let mut queue = mutex.lock().expect("Test error");

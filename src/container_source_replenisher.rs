@@ -17,12 +17,12 @@ use crate::{
 /// Representa a un reponedor de un contenedor a partir de otro contenedor. El contenedor usado como fuente puede agotarse
 pub struct ContainerReplenisher {
     source_ingredient: Ingredient,
-    destination_ingredient: Ingredient,
+    dest_ingredient: Ingredient,
     source_container_lock: Arc<Mutex<Container>>,
     dest_container_lock: Arc<Mutex<Container>>,
     replenisher_cond: Arc<Condvar>,
     ingredients_cond: Arc<Condvar>,
-    max_storage_of_container: u64,
+    max_storage_of_dest_container: u64,
 }
 
 impl ContainerReplenisher {
@@ -34,15 +34,15 @@ impl ContainerReplenisher {
         max_storage_of_container: u64,
     ) -> ContainerReplenisher {
         let (source_ingredient, source_container_lock) = source;
-        let (destination_ingredient, dest_container_lock) = dest;
+        let (dest_ingredient, dest_container_lock) = dest;
         ContainerReplenisher {
             source_ingredient,
-            destination_ingredient,
+            dest_ingredient,
             source_container_lock,
             dest_container_lock,
             replenisher_cond,
             ingredients_cond,
-            max_storage_of_container,
+            max_storage_of_dest_container: max_storage_of_container,
         }
     }
 
@@ -85,7 +85,7 @@ impl ContainerReplenisher {
         ));
         debug!(
             "[REPLENISHER] Replenished {:?} with {} of {:?}",
-            self.destination_ingredient, replenish_quantity, self.source_ingredient
+            self.dest_ingredient, replenish_quantity, self.source_ingredient
         );
         Ok(())
     }
@@ -99,17 +99,14 @@ impl ContainerReplenisher {
             .lock()
             .map_err(|_| CoffeeMakerError::LockError)?;
         let replenish_quantity = min(
-            self.max_storage_of_container - dest_remaining,
+            self.max_storage_of_dest_container - dest_remaining,
             source_container.remaining,
         );
 
         source_container.remaining -= replenish_quantity;
         source_container.consumed += replenish_quantity;
 
-        let mut source_is_empty = false;
-        if source_container.is_empty() {
-            source_is_empty = true;
-        }
+        let source_is_empty = source_container.is_empty();
         Ok((replenish_quantity, source_is_empty))
     }
 }

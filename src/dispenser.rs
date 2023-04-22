@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, Condvar, Mutex, RwLock},
+    sync::{Arc, Condvar, Mutex, MutexGuard, RwLock},
     thread,
     time::Duration,
 };
@@ -19,30 +19,30 @@ use crate::{
 /// reponedores de ingredientes (junto con su variable condicional), los recursos, y el contador de ordenes procesadas
 pub struct Dispenser {
     id: usize,
-    orders_list: Arc<Mutex<OrdersQueue>>,
-    orders_to_take: Arc<Condvar>,
+    orders_queue: Arc<Mutex<OrdersQueue>>,
+    orders_cond: Arc<Condvar>,
     replenisher: Arc<Condvar>,
-    ingredients_available: Arc<Condvar>,
     resources: Arc<HashMap<Ingredient, Arc<Mutex<Container>>>>,
+    ingredients_cond: Arc<Condvar>,
     orders_processed: Arc<RwLock<u64>>,
 }
 
 impl Dispenser {
     pub fn new(
         id: usize,
-        orders_list: Arc<Mutex<OrdersQueue>>,
-        orders_to_take: Arc<Condvar>,
+        orders_queue: Arc<Mutex<OrdersQueue>>,
+        orders_cond: Arc<Condvar>,
         replenisher: Arc<Condvar>,
-        ingredients_available: Arc<Condvar>,
+        ingredients_cond: Arc<Condvar>,
         resources: Arc<HashMap<Ingredient, Arc<Mutex<Container>>>>,
         orders_processed: Arc<RwLock<u64>>,
     ) -> Dispenser {
         Dispenser {
             id,
-            orders_list,
-            orders_to_take,
+            orders_queue,
+            orders_cond,
             replenisher,
-            ingredients_available,
+            ingredients_cond,
             resources,
             orders_processed,
         }
@@ -52,8 +52,8 @@ impl Dispenser {
         loop {
             let order = {
                 let mut orders = self
-                    .orders_to_take
-                    .wait_while(self.orders_list.lock()?, |queue| {
+                    .orders_cond
+                    .wait_while(self.orders_queue.lock()?, |queue| {
                         queue.is_empty() && !queue.finished
                     })?;
 
@@ -76,7 +76,7 @@ impl Dispenser {
             let resource_lock = self.get_resource_lock(&ingredient)?;
 
             let mut container = self
-                .ingredients_available
+                .ingredients_cond
                 .wait_while(resource_lock.lock()?, |container| {
                     self.should_wake_replenisher(container, quantity_required, &ingredient)
                 })
@@ -136,7 +136,7 @@ impl Dispenser {
 
     fn consume_ingredient(
         &self,
-        mutex: &mut std::sync::MutexGuard<Container>,
+        mutex: &mut MutexGuard<Container>,
         quantity_required: u64,
         ingredient: &Ingredient,
     ) {

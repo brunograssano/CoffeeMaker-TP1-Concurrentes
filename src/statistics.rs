@@ -8,12 +8,16 @@ use std::{
 use log::error;
 
 use crate::{
-    constants::{C_STORAGE, L_STORAGE, M_STORAGE, STATISTICS_WAIT_IN_MS, X_PERCENTAGE_OF_CAPACITY},
+    constants::{
+        C_CACAO_STORAGE, L_MILK_STORAGE, M_COFFEE_STORAGE, STATISTICS_WAIT_IN_MS,
+        X_PERCENTAGE_OF_CAPACITY,
+    },
     container::Container,
     errors::CoffeeMakerError,
     order::Ingredient,
 };
 
+/// Estructura que se va a encargar de imprimir periodicamente las estadisticas de la cafetera
 pub struct StatisticsPrinter {
     pub processed: Arc<RwLock<u64>>,
     pub resources: Arc<HashMap<Ingredient, Arc<Mutex<Container>>>>,
@@ -92,9 +96,9 @@ impl StatisticsPrinter {
 
 fn print_warning_if_below_x_level(ingredient: &Ingredient, remaining: u64) {
     match ingredient {
-        Ingredient::Cacao => handle_warning_level(ingredient, remaining, C_STORAGE),
-        Ingredient::ColdMilk => handle_warning_level(ingredient, remaining, L_STORAGE),
-        Ingredient::GrainsToGrind => handle_warning_level(ingredient, remaining, M_STORAGE),
+        Ingredient::Cacao => handle_warning_level(ingredient, remaining, C_CACAO_STORAGE),
+        Ingredient::ColdMilk => handle_warning_level(ingredient, remaining, L_MILK_STORAGE),
+        Ingredient::GrainsToGrind => handle_warning_level(ingredient, remaining, M_COFFEE_STORAGE),
         _ => {}
     }
 }
