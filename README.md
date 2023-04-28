@@ -42,6 +42,14 @@ Algunas pruebas destacadas son:
 
 *Nota: Algunas pruebas se hacen considerando que los valores iniciales de los recursos son de 5000.*
 
+### Dependencias
+
+La aplicación tiene las siguientes dependencias:
+* `serde` y `serde_json` para poder leer y parsear los archivos JSON
+* `rand` para generar numeros pseudoaleatorios, es usado al desordenar los ingredientes *(ver implementación)*
+* `log` provee una unica interfaz para los logs *(error!(), info!(), debug!())*
+* `simple_logger` la implementación de `log` para imprimir los mensajes.
+
 ## Diseño e implementación
 
 ### Formato del archivo
