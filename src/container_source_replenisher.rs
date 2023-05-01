@@ -2,7 +2,6 @@
 use std::{
     cmp::min,
     sync::{Arc, Condvar, Mutex},
-    thread,
     time::Duration,
 };
 
@@ -14,6 +13,21 @@ use crate::{
     errors::CoffeeMakerError,
     order::Ingredient,
 };
+
+mod sync {
+    use std::thread;
+    use std::time::Duration;
+
+    #[cfg(not(test))]
+    pub(crate) fn sleep(d: Duration) {
+        thread::sleep(d);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn sleep(_: Duration) {
+        thread::yield_now();
+    }
+}
 
 /// Representa a un reponedor de un contenedor a partir de otro contenedor. El contenedor usado como fuente puede agotarse
 pub struct ContainerReplenisher {
@@ -81,7 +95,7 @@ impl ContainerReplenisher {
             self.take_resource_from_source(dest_container.remaining)?;
         dest_container.remaining += replenish_quantity;
         dest_container.finished = source_is_empty;
-        thread::sleep(Duration::from_millis(
+        sync::sleep(Duration::from_millis(
             MINIMUM_WAIT_TIME_REPLENISHER + replenish_quantity,
         ));
         debug!(

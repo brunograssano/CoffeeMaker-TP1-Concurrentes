@@ -2,7 +2,6 @@
 use std::{
     collections::HashMap,
     sync::{Arc, Condvar, Mutex, MutexGuard, RwLock},
-    thread,
     time::Duration,
 };
 
@@ -14,6 +13,21 @@ use crate::{
     order::{Ingredient, Order},
     orders_queue::OrdersQueue,
 };
+
+mod sync {
+    use std::thread;
+    use std::time::Duration;
+
+    #[cfg(not(test))]
+    pub(crate) fn sleep(d: Duration) {
+        thread::sleep(d);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn sleep(_: Duration) {
+        thread::yield_now();
+    }
+}
 
 /// Representa a un dispenser de la cafetera.
 /// Tiene referencias a la cola de pedidos (junto con su variable condicional),
@@ -147,7 +161,7 @@ impl Dispenser {
         );
         mutex.remaining -= quantity_required;
         mutex.consumed += quantity_required;
-        thread::sleep(Duration::from_millis(quantity_required));
+        sync::sleep(Duration::from_millis(quantity_required));
         debug!(
             "[DISPENSER {}] Remains {} of {:?}",
             self.id, mutex.remaining, ingredient

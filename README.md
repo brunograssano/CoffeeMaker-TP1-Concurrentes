@@ -39,8 +39,12 @@ Algunas pruebas destacadas son:
 * Se prueba con pedidos en cantidad
 * Se prueba que recargue los contenedores
 * Se prueba que saltee pedidos en caso de agotarse los recursos
+* Se prueba que se agoten todos los contenedores (los posibles)
 
-*Nota: Algunas pruebas se hacen considerando que los valores iniciales de los recursos son de 5000.*
+Los archivos usados en estos tests se pueden ver en la carpeta `tests`.
+
+* *Nota: Algunas pruebas se hacen considerando que los valores iniciales de los recursos son de 5000.*
+* *Nota 2: Durante los tests el sleep es remplazado por yield.*
 
 ### Dependencias
 

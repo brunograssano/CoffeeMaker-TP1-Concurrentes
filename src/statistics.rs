@@ -2,7 +2,6 @@
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex, RwLock},
-    thread,
     time::Duration,
 };
 
@@ -17,6 +16,21 @@ use crate::{
     errors::CoffeeMakerError,
     order::Ingredient,
 };
+
+mod sync {
+    use std::thread;
+    use std::time::Duration;
+
+    #[cfg(not(test))]
+    pub(crate) fn sleep(d: Duration) {
+        thread::sleep(d);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn sleep(_: Duration) {
+        thread::yield_now();
+    }
+}
 
 /// Estructura que se va a encargar de imprimir periodicamente las estadisticas de la cafetera
 pub struct StatisticsPrinter {
@@ -54,7 +68,7 @@ impl StatisticsPrinter {
 
             self.print_statistics()?;
 
-            thread::sleep(Duration::from_millis(STATISTICS_WAIT_IN_MS));
+            sync::sleep(Duration::from_millis(STATISTICS_WAIT_IN_MS));
         }
     }
 

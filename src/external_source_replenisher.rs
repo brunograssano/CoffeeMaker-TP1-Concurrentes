@@ -1,7 +1,6 @@
 //! Reponedor de la cafetera a partir de una fuente externa. Por ejemplo el agua.
 use std::{
     sync::{Arc, Condvar, Mutex},
-    thread,
     time::Duration,
 };
 
@@ -13,6 +12,21 @@ use crate::{
     errors::CoffeeMakerError,
     order::Ingredient,
 };
+
+mod sync {
+    use std::thread;
+    use std::time::Duration;
+
+    #[cfg(not(test))]
+    pub(crate) fn sleep(d: Duration) {
+        thread::sleep(d);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn sleep(_: Duration) {
+        thread::yield_now();
+    }
+}
 
 /// Representa a un reponedor de un contenedor a partir de una fuente externa. Esta fuente no se agota
 pub struct ExternalReplenisher {
@@ -69,7 +83,7 @@ impl ExternalReplenisher {
     fn replenish(&self, container: &mut std::sync::MutexGuard<Container>) {
         let replenish_quantity = self.max_storage_of_container - container.remaining;
         container.remaining += replenish_quantity;
-        thread::sleep(Duration::from_millis(
+        sync::sleep(Duration::from_millis(
             MINIMUM_WAIT_TIME_REPLENISHER + replenish_quantity,
         ));
         info!(
