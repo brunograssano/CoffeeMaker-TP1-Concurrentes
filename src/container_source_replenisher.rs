@@ -169,7 +169,7 @@ mod tests {
         {
             let container = cold_milk.lock().expect("Lock error in test");
             assert_eq!(container.remaining, 0);
-            assert_eq!(container.consumed, E_FOAM_STORAGE);
+            assert_eq!(container.consumed, L_MILK_STORAGE);
         }
 
         milk_replenisher.finish();
