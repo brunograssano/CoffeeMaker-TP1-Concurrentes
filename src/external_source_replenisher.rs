@@ -92,3 +92,43 @@ impl ExternalReplenisher {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::thread;
+
+    use crate::constants::A_WATER_STORAGE;
+
+    use super::*;
+
+    #[test]
+    fn should_replenish_the_container_when_awaken() {
+        let hot_water = Arc::new(Mutex::new(Container::new(A_WATER_STORAGE)));
+        let replenisher_cond = Arc::new(Condvar::new());
+        let ingredients_cond = Arc::new(Condvar::new());
+        let water_replenisher = Arc::new(ExternalReplenisher::new(
+            (Ingredient::HotWater, hot_water.clone()),
+            replenisher_cond.clone(),
+            ingredients_cond.clone(),
+            A_WATER_STORAGE,
+        ));
+        let water_clone = water_replenisher.clone();
+        let handle = thread::spawn(move || water_clone.replenish_container());
+
+        {
+            let mut container = hot_water.lock().expect("Lock error in test");
+            container.remaining = 0;
+        }
+        replenisher_cond.notify_all();
+        {
+            let container = ingredients_cond
+                .wait_while(hot_water.lock().expect("Lock error in test"), |container| {
+                    container.remaining < A_WATER_STORAGE
+                })
+                .expect("Test error when returning from condvar");
+            assert_eq!(container.remaining, A_WATER_STORAGE);
+        }
+        water_replenisher.finish();
+        _ = handle.join().expect("Error when joining thread");
+    }
+}

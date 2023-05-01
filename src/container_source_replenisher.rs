@@ -125,3 +125,54 @@ impl ContainerReplenisher {
         Ok((replenish_quantity, source_is_empty))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::thread;
+
+    use crate::constants::{E_FOAM_STORAGE, L_MILK_STORAGE};
+
+    use super::*;
+
+    /// Las cantidades de los ingredientes fueron calculadas con valores iniciales de 5000
+    #[test]
+    fn should_replenish_the_container_taking_resource_from_second_container_when_awaken() {
+        let cold_milk = Arc::new(Mutex::new(Container::new(L_MILK_STORAGE)));
+        let milk_foam = Arc::new(Mutex::new(Container::new(E_FOAM_STORAGE)));
+        let replenisher_cond = Arc::new(Condvar::new());
+        let ingredients_cond = Arc::new(Condvar::new());
+
+        let milk_replenisher = Arc::new(ContainerReplenisher::new(
+            (Ingredient::ColdMilk, cold_milk.clone()),
+            (Ingredient::MilkFoam, milk_foam.clone()),
+            replenisher_cond.clone(),
+            ingredients_cond.clone(),
+            E_FOAM_STORAGE,
+        ));
+        let milk_clone = milk_replenisher.clone();
+
+        let handle = thread::spawn(move || milk_clone.replenish_container());
+
+        {
+            let mut container = milk_foam.lock().expect("Lock error in test");
+            container.remaining = 0;
+        }
+        replenisher_cond.notify_all();
+        {
+            let container = ingredients_cond
+                .wait_while(milk_foam.lock().expect("Lock error in test"), |container| {
+                    container.remaining < E_FOAM_STORAGE
+                })
+                .expect("Test error when returning from condvar");
+            assert_eq!(container.remaining, E_FOAM_STORAGE);
+        }
+        {
+            let container = cold_milk.lock().expect("Lock error in test");
+            assert_eq!(container.remaining, 0);
+            assert_eq!(container.consumed, E_FOAM_STORAGE);
+        }
+
+        milk_replenisher.finish();
+        _ = handle.join().expect("Error when joining thread");
+    }
+}
