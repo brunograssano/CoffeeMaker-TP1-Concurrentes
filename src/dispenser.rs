@@ -172,3 +172,145 @@ impl Dispenser {
 fn has_no_replenisher(ingredient: &Ingredient) -> bool {
     *ingredient == Ingredient::Cacao
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        constants::{
+            A_WATER_STORAGE, C_CACAO_STORAGE, E_FOAM_STORAGE, G_GRAINS_STORAGE, L_MILK_STORAGE,
+            M_COFFEE_STORAGE,
+        },
+        order::TOTAL_INGREDIENTS,
+    };
+
+    use super::*;
+
+    /// Las cantidades de los ingredientes fueron calculadas con valores iniciales de 5000
+    #[test]
+    fn should_process_an_order() {
+        let mut resources = HashMap::with_capacity(TOTAL_INGREDIENTS);
+        let cold_milk = Arc::new(Mutex::new(Container::new(L_MILK_STORAGE)));
+        let milk_foam = Arc::new(Mutex::new(Container::new(E_FOAM_STORAGE)));
+        let hot_water = Arc::new(Mutex::new(Container::new(A_WATER_STORAGE)));
+        let grains_to_grind = Arc::new(Mutex::new(Container::new(G_GRAINS_STORAGE)));
+        let ground_coffee = Arc::new(Mutex::new(Container::new(M_COFFEE_STORAGE)));
+        resources.insert(Ingredient::ColdMilk, cold_milk.clone());
+        resources.insert(Ingredient::MilkFoam, milk_foam.clone());
+        resources.insert(Ingredient::HotWater, hot_water.clone());
+        resources.insert(Ingredient::GrainsToGrind, grains_to_grind.clone());
+        resources.insert(Ingredient::GroundCoffee, ground_coffee.clone());
+        resources.insert(
+            Ingredient::Cacao,
+            Arc::new(Mutex::new(Container::new(C_CACAO_STORAGE))),
+        );
+
+        // Initialize dispenser shared data
+        let resources = Arc::new(resources);
+        let orders_queue = Arc::new(Mutex::new(OrdersQueue::new()));
+        let orders_cond = Arc::new(Condvar::new());
+        let replenisher_cond = Arc::new(Condvar::new());
+        let ingredients_cond = Arc::new(Condvar::new());
+        let orders_processed = Arc::new(RwLock::new(0));
+
+        let dispenser = Arc::new(Dispenser::new(
+            1,
+            orders_queue.clone(),
+            orders_cond.clone(),
+            replenisher_cond.clone(),
+            ingredients_cond.clone(),
+            resources.clone(),
+            orders_processed.clone(),
+        ));
+
+        let result = dispenser.process_order(Order::new(
+            1,
+            vec![(Ingredient::HotWater, 100), (Ingredient::GroundCoffee, 100)],
+        ));
+
+        assert!(result.is_ok());
+        assert_eq!(
+            1,
+            *orders_processed
+                .read()
+                .expect("Error reading processed orders in test")
+        );
+
+        let container = hot_water.lock().expect("Error in hot water lock in test");
+        assert_eq!(A_WATER_STORAGE - 100, container.remaining);
+        assert_eq!(100, container.consumed);
+
+        let container = ground_coffee.lock().expect("Error in coffee lock in test");
+        assert_eq!(M_COFFEE_STORAGE - 100, container.remaining);
+        assert_eq!(100, container.consumed);
+    }
+
+    /// Las cantidades de los ingredientes fueron calculadas con valores iniciales de 5000
+    #[test]
+    fn should_skip_an_order_if_there_is_no_resource_left() {
+        let mut resources = HashMap::with_capacity(TOTAL_INGREDIENTS);
+        let cold_milk = Arc::new(Mutex::new(Container::new(L_MILK_STORAGE)));
+        let milk_foam = Arc::new(Mutex::new(Container::new(E_FOAM_STORAGE)));
+        let hot_water = Arc::new(Mutex::new(Container::new(A_WATER_STORAGE)));
+        let grains_to_grind = Arc::new(Mutex::new(Container::new(G_GRAINS_STORAGE)));
+        let ground_coffee = Arc::new(Mutex::new(Container::new(M_COFFEE_STORAGE)));
+        let cacao = Arc::new(Mutex::new(Container::new(C_CACAO_STORAGE)));
+        resources.insert(Ingredient::ColdMilk, cold_milk.clone());
+        resources.insert(Ingredient::MilkFoam, milk_foam.clone());
+        resources.insert(Ingredient::HotWater, hot_water.clone());
+        resources.insert(Ingredient::GrainsToGrind, grains_to_grind.clone());
+        resources.insert(Ingredient::GroundCoffee, ground_coffee.clone());
+        resources.insert(Ingredient::Cacao, cacao.clone());
+
+        // Initialize dispenser shared data
+        let resources = Arc::new(resources);
+        let orders_queue = Arc::new(Mutex::new(OrdersQueue::new()));
+        let orders_cond = Arc::new(Condvar::new());
+        let replenisher_cond = Arc::new(Condvar::new());
+        let ingredients_cond = Arc::new(Condvar::new());
+        let orders_processed = Arc::new(RwLock::new(0));
+
+        let dispenser = Arc::new(Dispenser::new(
+            1,
+            orders_queue.clone(),
+            orders_cond.clone(),
+            replenisher_cond.clone(),
+            ingredients_cond.clone(),
+            resources.clone(),
+            orders_processed.clone(),
+        ));
+        {
+            let mut container = cacao.lock().expect("Error in cacao lock in test");
+            container.remaining = 0;
+            container.consumed = C_CACAO_STORAGE;
+        }
+
+        let result = dispenser.process_order(Order::new(
+            1,
+            vec![
+                (Ingredient::HotWater, 100),
+                (Ingredient::Cacao, 100),
+                (Ingredient::MilkFoam, 100),
+            ],
+        ));
+
+        assert!(result.is_ok());
+        assert_eq!(
+            0,
+            *orders_processed
+                .read()
+                .expect("Error reading processed orders in test")
+        );
+
+        let container = hot_water.lock().expect("Error in hot water lock in test");
+        assert_eq!(A_WATER_STORAGE - 100, container.remaining);
+        assert_eq!(100, container.consumed);
+
+        let container = cacao.lock().expect("Error in cacao lock in test");
+        assert_eq!(0, container.remaining);
+        assert_eq!(C_CACAO_STORAGE, container.consumed);
+
+        let container = milk_foam.lock().expect("Error in milk foam lock in test");
+        assert_eq!(E_FOAM_STORAGE, container.remaining);
+        assert_eq!(0, container.consumed);
+    }
+}
