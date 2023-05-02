@@ -118,7 +118,7 @@ A partir del diagrama podemos notar:
 * No se incluyo en el diagrama la comunicación con el hilo principal (main) para dar más claridad al diagrama. El hilo principal lo que hace es iniciar y esperar a que terminen los hilos.
     * En el caso de los hilos de estadísticas y reponedores, el hilo principal antes de esperarlos (join) realiza un cambio en sus estados para indicar que ya pueden finalizar. En los reponedores este cambio es notificado a través de su variable condicional, ya que pueden estar durmiendo cuando es realizado el cambio.
 * La aplicación inicializa un total de N + 5 hilos adicionales durante toda su ejecución. Se armó un diseño donde la cantidad de hilos sea conocida para reducir el tiempo y costo de estar creando threads.
-    * N dispensadores, estos trabajan solamente si tienen pedidos.
+    * N dispensadores, estos trabajan solamente si tienen pedidos. N se define en la constante `N_DISPENSERS`
     * 3 hilos para reponedores (agua, leche, cafe), trabajan a pedido de un dispenser si se cumple su condición.
     * Hilo de estadísticas, imprime periódicamente por pantalla.
     * Lector de archivo, funciona hasta que se cargan todos los pedidos.
